@@ -13,7 +13,7 @@ Zyncx enables private deposits, withdrawals, and swaps using confidential comput
 ## Architecture
 
 ```
-programs/zyncx/src/
+contracts/solana/zyncx/src/
 ├── lib.rs                 # Program entrypoint
 ├── errors/
 │   └── mod.rs            # Custom error types
