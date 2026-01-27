@@ -57,7 +57,7 @@ pub fn handler(ctx: Context<InitializeVault>, asset_mint: Pubkey) -> Result<()> 
     merkle_tree.size = 0;
     merkle_tree.current_root_index = 0;
     merkle_tree.root = [0u8; 32];
-    merkle_tree.roots = vec![[0u8; 32]; 100];
+    merkle_tree.roots = [[0u8; 32]; crate::state::merkle_tree::ROOT_HISTORY_SIZE];
     merkle_tree.leaves = Vec::new();
 
     msg!("Vault initialized for asset: {:?}", asset_mint);

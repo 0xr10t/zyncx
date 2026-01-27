@@ -58,4 +58,19 @@ pub enum ZyncxError {
 
     #[msg("Unauthorized access")]
     Unauthorized,
+
+    #[msg("Invalid swap router program")]
+    InvalidSwapRouter,
+
+    #[msg("Insufficient funds in vault")]
+    InsufficientFunds,
+
+    #[msg("Swap slippage exceeded")]
+    SlippageExceeded,
+
+    #[msg("Invalid swap route")]
+    InvalidSwapRoute,
+
+    #[msg("DEX swap execution failed")]
+    SwapExecutionFailed,
 }
