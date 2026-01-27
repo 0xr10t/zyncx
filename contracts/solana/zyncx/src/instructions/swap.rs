@@ -1,13 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 
+use crate::dex::{
+    jupiter::{execute_jupiter_swap, transfer_sol_from_treasury, JUPITER_V6_PROGRAM_ID},
+    types::SwapRoute,
+};
 use crate::state::{MerkleTreeState, VaultState, VaultType, NullifierState, SwapParam};
 use crate::errors::ZyncxError;
 
 #[derive(Accounts)]
 #[instruction(nullifier: [u8; 32])]
 pub struct SwapNative<'info> {
-    /// CHECK: Recipient of swapped tokens
+    /// CHECK: Recipient of swapped tokens (or intermediate token account)
     #[account(mut)]
     pub recipient: AccountInfo<'info>,
 
@@ -42,24 +46,26 @@ pub struct SwapNative<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: DEX swap router program
-    pub swap_router: AccountInfo<'info>,
+    /// CHECK: Jupiter V6 program for DEX aggregation
+    #[account(address = JUPITER_V6_PROGRAM_ID)]
+    pub jupiter_program: AccountInfo<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+    // Remaining accounts: All accounts required by Jupiter swap route
 }
 
-pub fn handler_native(
-    ctx: Context<SwapNative>,
+pub fn handler_native<'info>(
+    ctx: Context<'_, '_, 'info, 'info, SwapNative<'info>>,
     swap_param: SwapParam,
     nullifier: [u8; 32],
     new_commitment: [u8; 32],
     proof: Vec<u8>,
+    swap_data: Vec<u8>,
 ) -> Result<()> {
     require!(swap_param.amount_in > 0, ZyncxError::InvalidSwapAmount);
-    require!(swap_param.fee > 0, ZyncxError::InvalidFeeAmount);
 
     let vault = &ctx.accounts.vault;
     let merkle_tree = &mut ctx.accounts.merkle_tree;
@@ -93,16 +99,30 @@ pub fn handler_native(
     // Insert new commitment into merkle tree
     merkle_tree.insert(new_commitment)?;
 
-    // Execute swap via DEX router
-    // NOTE: This is a placeholder - actual implementation depends on the DEX being used
-    // For Jupiter, Raydium, or Orca, you would CPI into their swap programs
-    execute_swap_native(
-        &ctx.accounts.vault_treasury,
-        &ctx.accounts.swap_router,
-        &swap_param,
-        ctx.bumps.vault_treasury,
-        &ctx.accounts.vault.key(),
-    )?;
+    // Check if this is a direct transfer (same token) or a swap
+    let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
+
+    if is_direct_transfer {
+        // Direct SOL transfer - no swap needed
+        transfer_sol_from_treasury(
+            &ctx.accounts.vault_treasury,
+            &ctx.accounts.recipient,
+            swap_param.amount_in,
+            &vault.key(),
+            ctx.bumps.vault_treasury,
+        )?;
+    } else {
+        // Execute swap via Jupiter
+        execute_jupiter_swap(
+            &ctx.accounts.vault_treasury,
+            &ctx.accounts.recipient,
+            &ctx.accounts.jupiter_program,
+            swap_data,
+            ctx.remaining_accounts,
+            &vault.key(),
+            ctx.bumps.vault_treasury,
+        )?;
+    }
 
     // Emit event
     emit!(SwappedEvent {
@@ -115,7 +135,7 @@ pub fn handler_native(
         new_commitment,
     });
 
-    msg!("Swapped {} lamports", swap_param.amount_in);
+    msg!("Swapped {} lamports via Jupiter", swap_param.amount_in);
 
     Ok(())
 }
@@ -157,25 +177,27 @@ pub struct SwapToken<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: DEX swap router program
-    pub swap_router: AccountInfo<'info>,
+    /// CHECK: Jupiter V6 program for DEX aggregation
+    #[account(address = JUPITER_V6_PROGRAM_ID)]
+    pub jupiter_program: AccountInfo<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    // Remaining accounts: All accounts required by Jupiter swap route
 }
 
-pub fn handler_token(
-    ctx: Context<SwapToken>,
+pub fn handler_token<'info>(
+    ctx: Context<'_, '_, 'info, 'info, SwapToken<'info>>,
     swap_param: SwapParam,
     nullifier: [u8; 32],
     new_commitment: [u8; 32],
     proof: Vec<u8>,
+    swap_data: Vec<u8>,
 ) -> Result<()> {
     require!(swap_param.amount_in > 0, ZyncxError::InvalidSwapAmount);
-    require!(swap_param.fee > 0, ZyncxError::InvalidFeeAmount);
 
     let vault = &ctx.accounts.vault;
     let merkle_tree = &mut ctx.accounts.merkle_tree;
@@ -209,16 +231,32 @@ pub fn handler_token(
     // Insert new commitment into merkle tree
     merkle_tree.insert(new_commitment)?;
 
-    // Execute swap via DEX router
-    // NOTE: This is a placeholder - actual implementation depends on the DEX being used
-    execute_swap_token(
-        &ctx.accounts.vault_token_account,
-        &ctx.accounts.swap_router,
-        &ctx.accounts.token_program,
-        &swap_param,
-        ctx.bumps.vault_token_account,
-        &ctx.accounts.vault.key(),
-    )?;
+    // Check if this is a direct transfer (same token) or a swap
+    let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
+
+    if is_direct_transfer {
+        // Direct token transfer - no swap needed
+        use crate::dex::jupiter::transfer_tokens_from_vault;
+        transfer_tokens_from_vault(
+            &ctx.accounts.vault_token_account,
+            &ctx.accounts.recipient,
+            &ctx.accounts.token_program,
+            swap_param.amount_in,
+            &vault.key(),
+            ctx.bumps.vault_token_account,
+        )?;
+    } else {
+        // Execute swap via Jupiter
+        execute_jupiter_swap(
+            &ctx.accounts.vault_token_account.to_account_info(),
+            &ctx.accounts.recipient,
+            &ctx.accounts.jupiter_program,
+            swap_data,
+            ctx.remaining_accounts,
+            &vault.key(),
+            ctx.bumps.vault_token_account,
+        )?;
+    }
 
     // Emit event
     emit!(SwappedEvent {
@@ -231,7 +269,7 @@ pub fn handler_token(
         new_commitment,
     });
 
-    msg!("Swapped {} tokens", swap_param.amount_in);
+    msg!("Swapped {} tokens via Jupiter", swap_param.amount_in);
 
     Ok(())
 }
@@ -241,50 +279,7 @@ fn verify_groth16_proof(proof: &[u8], public_inputs: &[[u8; 32]; 4]) -> Result<(
     if proof.is_empty() {
         return Err(ZyncxError::InvalidZKProof.into());
     }
-    msg!("ZK Proof verification placeholder - implement with groth16-solana");
-    Ok(())
-}
-
-#[allow(unused_variables)]
-fn execute_swap_native(
-    vault_treasury: &AccountInfo,
-    swap_router: &AccountInfo,
-    swap_param: &SwapParam,
-    treasury_bump: u8,
-    vault_key: &Pubkey,
-) -> Result<()> {
-    // TODO: Implement actual DEX swap CPI
-    // This would typically involve:
-    // 1. Approving the swap router to spend tokens
-    // 2. Calling the swap router's swap instruction
-    // 3. Verifying minimum output amount received
-    //
-    // For Jupiter aggregator, you would use jupiter_cpi
-    // For Raydium, you would use raydium_amm_cpi
-    // For Orca, you would use orca_whirlpool_cpi
-    
-    msg!("Swap execution placeholder - implement with DEX CPI");
-    msg!("Amount in: {}", swap_param.amount_in);
-    msg!("Min amount out: {}", swap_param.min_amount_out);
-    
-    Ok(())
-}
-
-#[allow(unused_variables)]
-fn execute_swap_token(
-    vault_token_account: &Account<TokenAccount>,
-    swap_router: &AccountInfo,
-    token_program: &Program<Token>,
-    swap_param: &SwapParam,
-    token_account_bump: u8,
-    vault_key: &Pubkey,
-) -> Result<()> {
-    // TODO: Implement actual DEX swap CPI for SPL tokens
-    
-    msg!("Token swap execution placeholder - implement with DEX CPI");
-    msg!("Amount in: {}", swap_param.amount_in);
-    msg!("Min amount out: {}", swap_param.min_amount_out);
-    
+    msg!("ZK Proof verification placeholder - implement with Arcium/groth16-solana");
     Ok(())
 }
 

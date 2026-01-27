@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+pub mod dex;
 pub mod errors;
 pub mod instructions;
 pub mod state;
@@ -58,26 +59,28 @@ pub mod zyncx {
         instructions::withdraw::handler_token(ctx, amount, nullifier, new_commitment, proof)
     }
 
-    /// Swap native SOL via DEX with ZK proof
-    pub fn swap_native(
-        ctx: Context<SwapNative>,
+    /// Swap native SOL via DEX (Jupiter) with ZK proof
+    pub fn swap_native<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SwapNative<'info>>,
         swap_param: SwapParam,
         nullifier: [u8; 32],
         new_commitment: [u8; 32],
         proof: Vec<u8>,
+        swap_data: Vec<u8>,
     ) -> Result<()> {
-        instructions::swap::handler_native(ctx, swap_param, nullifier, new_commitment, proof)
+        instructions::swap::handler_native(ctx, swap_param, nullifier, new_commitment, proof, swap_data)
     }
 
-    /// Swap SPL tokens via DEX with ZK proof
-    pub fn swap_token(
-        ctx: Context<SwapToken>,
+    /// Swap SPL tokens via DEX (Jupiter) with ZK proof
+    pub fn swap_token<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SwapToken<'info>>,
         swap_param: SwapParam,
         nullifier: [u8; 32],
         new_commitment: [u8; 32],
         proof: Vec<u8>,
+        swap_data: Vec<u8>,
     ) -> Result<()> {
-        instructions::swap::handler_token(ctx, swap_param, nullifier, new_commitment, proof)
+        instructions::swap::handler_token(ctx, swap_param, nullifier, new_commitment, proof, swap_data)
     }
 
     /// Verify a ZK proof without executing withdrawal
