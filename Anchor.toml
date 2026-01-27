@@ -12,7 +12,9 @@ zyncx = "6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6"
 url = "https://api.apr.dev"
 
 [provider]
+# For testing use localnet, for deployment use devnet
 cluster = "Localnet"
+# cluster = "devnet"  # Uncomment for devnet deployment
 wallet = "~/.config/solana/id.json"
 
 [scripts]
@@ -23,3 +25,4 @@ anchor_version = "0.30.1"
 
 [workspace]
 members = ["contracts/solana/*"]
+
