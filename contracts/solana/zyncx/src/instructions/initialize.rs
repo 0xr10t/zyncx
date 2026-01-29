@@ -17,7 +17,7 @@ pub struct InitializeVault<'info> {
         seeds = [b"vault", asset_mint.as_ref()],
         bump
     )]
-    pub vault: Account<'info, VaultState>,
+    pub vault: Box<Account<'info, VaultState>>,
 
     #[account(
         init,
@@ -26,7 +26,7 @@ pub struct InitializeVault<'info> {
         seeds = [b"merkle_tree", vault.key().as_ref()],
         bump
     )]
-    pub merkle_tree: Account<'info, MerkleTreeState>,
+    pub merkle_tree: Box<Account<'info, MerkleTreeState>>,
 
     pub system_program: Program<'info, System>,
 }

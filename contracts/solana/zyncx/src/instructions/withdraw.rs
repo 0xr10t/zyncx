@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{instruction::Instruction, program::invoke};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::state::{MerkleTreeState, VaultState, VaultType, NullifierState};
@@ -15,14 +16,14 @@ pub struct WithdrawNative<'info> {
         seeds = [b"vault", vault.asset_mint.as_ref()],
         bump = vault.bump,
     )]
-    pub vault: Account<'info, VaultState>,
+    pub vault: Box<Account<'info, VaultState>>,
 
     #[account(
         mut,
         seeds = [b"merkle_tree", vault.key().as_ref()],
         bump = merkle_tree.bump,
     )]
-    pub merkle_tree: Account<'info, MerkleTreeState>,
+    pub merkle_tree: Box<Account<'info, MerkleTreeState>>,
 
     /// CHECK: Vault PDA that holds SOL
     #[account(
@@ -40,6 +41,9 @@ pub struct WithdrawNative<'info> {
         bump
     )]
     pub nullifier_account: Account<'info, NullifierState>,
+
+    /// CHECK: The Verifier Program deployed via Sunspot (mixer.so)
+    pub verifier_program: AccountInfo<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -65,18 +69,41 @@ pub fn handler_native(
     // Get current merkle root
     let root = merkle_tree.get_root();
 
-    // Verify ZK proof
+    // Verify ZK proof via CPI to verifier program
+    // Circuit expects public inputs: [root, nullifier_hash, recipient, amount]
+    let mut verifier_input = Vec::new();
+    
+    // 1. Append proof bytes
+    verifier_input.extend_from_slice(&proof);
+    
+    // 2. Public Input: Root (32 bytes)
+    verifier_input.extend_from_slice(&root);
+    
+    // 3. Public Input: Nullifier Hash (32 bytes)
+    verifier_input.extend_from_slice(&nullifier);
+    
+    // 4. Public Input: Recipient (32 bytes)
+    verifier_input.extend_from_slice(&ctx.accounts.recipient.key().to_bytes());
+    
+    // 5. Public Input: Amount (32 bytes, Big Endian)
     let mut amount_bytes = [0u8; 32];
     amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
+    verifier_input.extend_from_slice(&amount_bytes);
     
-    let public_inputs = [
-        amount_bytes,
-        root,
-        new_commitment,
-        nullifier,
-    ];
+    // Invoke verifier program
+    let instruction = Instruction {
+        program_id: *ctx.accounts.verifier_program.key,
+        accounts: vec![],
+        data: verifier_input,
+    };
     
-    verify_groth16_proof(&proof, &public_inputs)?;
+    msg!("Invoking ZK Verifier...");
+    invoke(
+        &instruction,
+        &[ctx.accounts.verifier_program.clone()],
+    ).map_err(|_| ZyncxError::InvalidZKProof)?;
+    
+    msg!("ZK Proof Verified Successfully!");
 
     // Mark nullifier as spent
     nullifier_account.bump = ctx.bumps.nullifier_account;
@@ -120,24 +147,24 @@ pub struct WithdrawToken<'info> {
         seeds = [b"vault", vault.asset_mint.as_ref()],
         bump = vault.bump,
     )]
-    pub vault: Account<'info, VaultState>,
+    pub vault: Box<Account<'info, VaultState>>,
 
     #[account(
         mut,
         seeds = [b"merkle_tree", vault.key().as_ref()],
         bump = merkle_tree.bump,
     )]
-    pub merkle_tree: Account<'info, MerkleTreeState>,
+    pub merkle_tree: Box<Account<'info, MerkleTreeState>>,
 
     #[account(mut)]
-    pub recipient_token_account: Account<'info, TokenAccount>,
+    pub recipient_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
         seeds = [b"vault_token_account", vault.key().as_ref()],
         bump,
     )]
-    pub vault_token_account: Account<'info, TokenAccount>,
+    pub vault_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init,
@@ -147,6 +174,9 @@ pub struct WithdrawToken<'info> {
         bump
     )]
     pub nullifier_account: Account<'info, NullifierState>,
+
+    /// CHECK: The Verifier Program deployed via Sunspot (mixer.so)
+    pub verifier_program: AccountInfo<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -173,18 +203,40 @@ pub fn handler_token(
     // Get current merkle root
     let root = merkle_tree.get_root();
 
-    // Verify ZK proof
+    // Verify ZK proof via CPI to verifier program
+    let mut verifier_input = Vec::new();
+    
+    // 1. Append proof bytes
+    verifier_input.extend_from_slice(&proof);
+    
+    // 2. Public Input: Root (32 bytes)
+    verifier_input.extend_from_slice(&root);
+    
+    // 3. Public Input: Nullifier Hash (32 bytes)
+    verifier_input.extend_from_slice(&nullifier);
+    
+    // 4. Public Input: Recipient (32 bytes)
+    verifier_input.extend_from_slice(&ctx.accounts.recipient.key().to_bytes());
+    
+    // 5. Public Input: Amount (32 bytes, Big Endian)
     let mut amount_bytes = [0u8; 32];
     amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
+    verifier_input.extend_from_slice(&amount_bytes);
     
-    let public_inputs = [
-        amount_bytes,
-        root,
-        new_commitment,
-        nullifier,
-    ];
+    // Invoke verifier program
+    let instruction = Instruction {
+        program_id: *ctx.accounts.verifier_program.key,
+        accounts: vec![],
+        data: verifier_input,
+    };
     
-    verify_groth16_proof(&proof, &public_inputs)?;
+    msg!("Invoking ZK Verifier...");
+    invoke(
+        &instruction,
+        &[ctx.accounts.verifier_program.clone()],
+    ).map_err(|_| ZyncxError::InvalidZKProof)?;
+    
+    msg!("ZK Proof Verified Successfully!");
 
     // Mark nullifier as spent
     nullifier_account.bump = ctx.bumps.nullifier_account;
@@ -232,17 +284,7 @@ pub fn handler_token(
     Ok(())
 }
 
-#[allow(unused_variables)]
-fn verify_groth16_proof(proof: &[u8], public_inputs: &[[u8; 32]; 4]) -> Result<()> {
-    // TODO: Integrate with groth16-solana crate for actual verification
-    // Placeholder implementation
-    if proof.is_empty() {
-        return Err(ZyncxError::InvalidZKProof.into());
-    }
 
-    msg!("ZK Proof verification placeholder - implement with groth16-solana");
-    Ok(())
-}
 
 #[event]
 pub struct WithdrawnEvent {

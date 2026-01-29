@@ -20,14 +20,14 @@ pub struct SwapNative<'info> {
         seeds = [b"vault", vault.asset_mint.as_ref()],
         bump = vault.bump,
     )]
-    pub vault: Account<'info, VaultState>,
+    pub vault: Box<Account<'info, VaultState>>,
 
     #[account(
         mut,
         seeds = [b"merkle_tree", vault.key().as_ref()],
         bump = merkle_tree.bump,
     )]
-    pub merkle_tree: Account<'info, MerkleTreeState>,
+    pub merkle_tree: Box<Account<'info, MerkleTreeState>>,
 
     /// CHECK: Vault PDA that holds SOL
     #[account(
@@ -152,21 +152,21 @@ pub struct SwapToken<'info> {
         seeds = [b"vault", vault.asset_mint.as_ref()],
         bump = vault.bump,
     )]
-    pub vault: Account<'info, VaultState>,
+    pub vault: Box<Account<'info, VaultState>>,
 
     #[account(
         mut,
         seeds = [b"merkle_tree", vault.key().as_ref()],
         bump = merkle_tree.bump,
     )]
-    pub merkle_tree: Account<'info, MerkleTreeState>,
+    pub merkle_tree: Box<Account<'info, MerkleTreeState>>,
 
     #[account(
         mut,
         seeds = [b"vault_token_account", vault.key().as_ref()],
         bump,
     )]
-    pub vault_token_account: Account<'info, TokenAccount>,
+    pub vault_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init,
