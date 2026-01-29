@@ -73,4 +73,44 @@ pub enum ZyncxError {
 
     #[msg("DEX swap execution failed")]
     SwapExecutionFailed,
+
+    // ========================================================================
+    // Arcium / Confidential Computation Errors
+    // ========================================================================
+    
+    #[msg("Confidential swaps are currently disabled")]
+    ConfidentialSwapsDisabled,
+
+    #[msg("Amount is below minimum threshold")]
+    AmountTooSmall,
+
+    #[msg("Amount exceeds maximum threshold")]
+    AmountTooLarge,
+
+    #[msg("Invalid computation status for this operation")]
+    InvalidComputationStatus,
+
+    #[msg("Computation request has expired")]
+    ComputationExpired,
+
+    #[msg("Computation has not expired yet - cannot cancel")]
+    ComputationNotExpired,
+
+    #[msg("Invalid Arcium callback signature")]
+    InvalidArciumSignature,
+
+    #[msg("Invalid encrypted strategy format")]
+    InvalidEncryptedStrategy,
+
+    #[msg("Invalid token mint for operation")]
+    InvalidMint,
+
+    #[msg("Invalid price feed data")]
+    InvalidPriceFeed,
+
+    #[msg("Price feed is stale")]
+    StalePriceFeed,
+
+    #[msg("Price condition not met")]
+    PriceConditionNotMet,
 }

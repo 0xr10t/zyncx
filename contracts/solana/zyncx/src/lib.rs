@@ -6,7 +6,7 @@ pub mod instructions;
 pub mod state;
 
 use instructions::*;
-use state::SwapParam;
+use state::{SwapParam, ConfidentialSwapParams};
 
 declare_id!("6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6");
 
@@ -97,5 +97,62 @@ pub mod zyncx {
     /// Check if a root exists in the merkle tree history
     pub fn check_root(ctx: Context<CheckRoot>, root: [u8; 32]) -> Result<bool> {
         instructions::verify::check_root_exists(ctx, root)
+    }
+
+    // ========================================================================
+    // PHASE 2: ARCIUM CONFIDENTIAL COMPUTATION
+    // ========================================================================
+
+    /// Initialize Arcium MXE configuration
+    pub fn initialize_arcium_config(
+        ctx: Context<InitializeArciumConfig>,
+        mxe_address: Pubkey,
+        computation_fee: u64,
+        timeout_seconds: i64,
+    ) -> Result<()> {
+        instructions::confidential::handler_init_arcium_config(ctx, mxe_address, computation_fee, timeout_seconds)
+    }
+
+    /// Create a nullifier account for confidential operations
+    /// Must be called before queue_confidential_swap
+    pub fn create_nullifier(
+        ctx: Context<CreateNullifier>,
+        nullifier: [u8; 32],
+    ) -> Result<()> {
+        instructions::confidential::handler_create_nullifier(ctx, nullifier)
+    }
+
+    /// Queue a confidential swap to Arcium MXE
+    /// User sends encrypted trading bounds; Arcium processes without seeing plaintext
+    /// Note: Nullifier account must already exist (prevents stack overflow)
+    pub fn queue_confidential_swap(
+        ctx: Context<QueueConfidentialSwap>,
+        params: ConfidentialSwapParams,
+        proof: Vec<u8>,
+    ) -> Result<()> {
+        instructions::confidential::handler_queue_confidential_swap(ctx, params, proof)
+    }
+
+    /// Callback from Arcium MXE after confidential computation completes
+    /// Only callable by Arcium MXE program
+    pub fn confidential_swap_callback<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ConfidentialSwapCallback<'info>>,
+        request_id: u64,
+        computation_success: bool,
+        encrypted_result: Vec<u8>,
+        node_signature: [u8; 64],
+        swap_data: Vec<u8>,
+    ) -> Result<()> {
+        instructions::confidential::handler_confidential_swap_callback(
+            ctx, request_id, computation_success, encrypted_result, node_signature, swap_data
+        )
+    }
+
+    /// Cancel an expired computation request
+    pub fn cancel_computation(
+        ctx: Context<CancelComputation>,
+        request_id: u64,
+    ) -> Result<()> {
+        instructions::confidential::handler_cancel_computation(ctx, request_id)
     }
 }
