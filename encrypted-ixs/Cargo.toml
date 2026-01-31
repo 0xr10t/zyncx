@@ -1,0 +1,12 @@
+[package]
+name = "encrypted-ixs"
+version = "0.1.0"
+edition = "2021"
+description = "Arcis MPC circuits for ZYNCX confidential computations"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+arcis = "0.6.5"
+blake3 = "=1.8.2"
