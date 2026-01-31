@@ -1,5 +1,21 @@
 import { keccak_256 } from '@noble/hashes/sha3';
 
+/**
+ * Poseidon hash function (using keccak as fallback for demo)
+ * In production, this should use the actual Poseidon hash to match the circuit
+ */
+export function poseidonHash(...inputs: Uint8Array[]): Uint8Array {
+  // Concatenate all inputs
+  const totalLength = inputs.reduce((sum, input) => sum + input.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const input of inputs) {
+    combined.set(input, offset);
+    offset += input.length;
+  }
+  return keccak_256(combined);
+}
+
 // Generate random bytes
 export function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);

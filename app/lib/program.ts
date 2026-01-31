@@ -1,5 +1,7 @@
 import { PublicKey, Connection } from '@solana/web3.js';
-import { AnchorProvider, Program, Idl, BN } from '@coral-xyz/anchor';
+import { AnchorProvider, Program, Idl, BN, Wallet } from '@coral-xyz/anchor';
+// @ts-ignore - IDL will be available after deployment
+import idl from '../../../target/idl/zyncx.json';
 
 // Program ID - deployed on devnet
 export const PROGRAM_ID = new PublicKey('6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6');
@@ -83,4 +85,16 @@ export interface NullifierState {
   spent: boolean;
   spentAt: BN;
   vault: PublicKey;
+}
+
+/**
+ * Get Anchor program instance
+ */
+export function getProgram(connection: Connection, wallet: Wallet | any): Program {
+  const provider = new AnchorProvider(
+    connection,
+    wallet,
+    { commitment: 'confirmed' }
+  );
+  return new Program(idl as Idl, PROGRAM_ID, provider);
 }
