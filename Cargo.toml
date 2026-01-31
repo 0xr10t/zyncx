@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "contracts/solana/*"
+    "contracts/solana/*",
+    "encrypted-ixs"
 ]
 
 resolver = "2"

@@ -113,4 +113,32 @@ pub enum ZyncxError {
 
     #[msg("Price condition not met")]
     PriceConditionNotMet,
+
+    // ========================================================================
+    // Arcium MXE Specific Errors
+    // ========================================================================
+    
+    #[msg("Arcium cluster not set for this MXE")]
+    ClusterNotSet,
+
+    #[msg("Computation was aborted by the MXE")]
+    AbortedComputation,
+
+    #[msg("Invalid MXE account")]
+    InvalidMXEAccount,
+
+    #[msg("Invalid computation definition")]
+    InvalidComputationDef,
+
+    #[msg("Invalid callback from MXE")]
+    InvalidCallback,
+
+    #[msg("Encrypted state is corrupted")]
+    CorruptedEncryptedState,
+
+    #[msg("User position not found")]
+    PositionNotFound,
+
+    #[msg("Invalid encryption parameters")]
+    InvalidEncryptionParams,
 }

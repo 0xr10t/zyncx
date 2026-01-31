@@ -1,0 +1,9 @@
+[package]
+name = "encrypted-ixs"
+version = "0.1.0"
+edition = "2021"
+description = "Arcis MPC circuits for Zyncx privacy-preserving DeFi"
+
+[dependencies]
+arcis = "=0.6.3"
+blake3 = "=1.8.2"

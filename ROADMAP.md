@@ -24,14 +24,58 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that enables:
 | Withdraw Instructions | ✅ Done | `contracts/solana/zyncx/src/instructions/withdraw.rs` |
 | Jupiter DEX Integration | ✅ Done | `contracts/solana/zyncx/src/dex/jupiter.rs` |
 
-### Phase 2: Arcium Confidential Computation
+### Phase 2: Arcium MXE Integration (NEW - Three-Instruction Pattern)
 | Component | Status | Location |
 |-----------|--------|----------|
-| Arcium State Types | ✅ Done | `contracts/solana/zyncx/src/state/arcium.rs` |
-| Pyth Price Feed Types | ✅ Done | `contracts/solana/zyncx/src/state/pyth.rs` |
-| Confidential Swap Instructions | ✅ Done | `contracts/solana/zyncx/src/instructions/confidential.rs` |
-| Queue Computation | ✅ Done | `queue_confidential_swap` instruction |
-| Callback Handler | ✅ Done | `confidential_swap_callback` instruction |
+| Arcis MPC Circuits | ✅ Done | `encrypted-ixs/src/lib.rs` |
+| Encrypted State Accounts | ✅ Done | `contracts/solana/zyncx/src/state/arcium_mxe.rs` |
+| Computation Def Initializers | ✅ Done | `init_vault_comp_def`, `init_deposit_comp_def`, etc. |
+| Queue Encrypted Deposit | ✅ Done | `queue_encrypted_deposit` with ArgBuilder |
+| Queue Confidential Swap MXE | ✅ Done | `queue_confidential_swap_mxe` with ArgBuilder |
+| Deposit Callback | ✅ Done | `deposit_callback` with SignedComputationOutputs |
+| Swap Callback | ✅ Done | `confidential_swap_callback_mxe` |
+| Anchor 0.32.1 + Arcium 0.6.3 | ✅ Done | `Cargo.toml` updated |
+
+### Arcium Integration Architecture
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         ARCIUM THREE-INSTRUCTION PATTERN                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. INIT COMP DEF (one-time per circuit)                               │
+│     ┌──────────────────────────────────────────────────────────────┐   │
+│     │ init_vault_comp_def / init_deposit_comp_def / init_swap_comp_def  │
+│     │ - Registers circuit hash with MXE                            │   │
+│     │ - Points to off-chain circuit URL (GitHub raw)               │   │
+│     └──────────────────────────────────────────────────────────────┘   │
+│                              │                                         │
+│                              ▼                                         │
+│  2. QUEUE COMPUTATION (per user operation)                             │
+│     ┌──────────────────────────────────────────────────────────────┐   │
+│     │ queue_encrypted_deposit / queue_confidential_swap_mxe        │   │
+│     │ - ArgBuilder constructs encrypted payload:                   │   │
+│     │   • .x25519_pubkey(user_pubkey)     Enc<Shared,T> input      │   │
+│     │   • .plaintext_u128(nonce)          Client encryption nonce  │   │
+│     │   • .encrypted_u64(ciphertext)      User's encrypted data    │   │
+│     │   • .account(key, offset, size)     Enc<Mxe,T> on-chain state│   │
+│     │ - Registers callback instruction                             │   │
+│     └──────────────────────────────────────────────────────────────┘   │
+│                              │                                         │
+│                     ARX MPC NODES PROCESS                              │
+│                              │                                         │
+│                              ▼                                         │
+│  3. CALLBACK (invoked by MXE after computation)                        │
+│     ┌──────────────────────────────────────────────────────────────┐   │
+│     │ deposit_callback / confidential_swap_callback_mxe            │   │
+│     │ - Receives SignedComputationOutputs<T>                       │   │
+│     │ - Verifies cluster signature                                 │   │
+│     │ - Updates encrypted state accounts:                          │   │
+│     │   • vault.vault_state = tuple.field_0.ciphertexts            │   │
+│     │   • user_position.position_state = tuple.field_1.ciphertexts │   │
+│     └──────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -39,57 +83,63 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that enables:
 
 ### High Priority
 
-#### 1. Deploy Noir Verifier Program
+#### 1. Build and Test with Arcium CLI
 ```bash
-# The mixer.so needs to be deployed separately
-solana program deploy mixer/target/mixer.so --program-id mixer/target/mixer-keypair.json
+# Use arcium CLI instead of anchor build
+arcium build                    # Compiles circuits + program
+arcium test                     # Starts local ARX nodes + runs tests
+arcium test --cluster devnet    # Test on devnet
 ```
-- [ ] Deploy `mixer.so` to devnet/mainnet
-- [ ] Update verifier program ID in withdraw instructions
-- [ ] Test proof verification end-to-end
 
-#### 2. Fix IDL Generation
+#### 2. Deploy Circuits to GitHub
 ```bash
-# Current issue: proc_macro2::Span::source_file() not found
-# Options:
-# A) Use Anchor 0.29.0 (doesn't have this issue)
-# B) Use nightly Rust with proc_macro_span feature
-# C) Manually write IDL (not recommended)
+# Upload compiled .arcis files to circuits repo
+cp build/*.arcis /path/to/zyncx-circuits-repo/
+cd /path/to/zyncx-circuits-repo
+git add . && git commit -m "Add circuits" && git push
 ```
-- [ ] Resolve Anchor 0.30.1 IDL build issue
-- [ ] Generate TypeScript types from IDL
+Update circuit URLs in `arcium_mxe.rs`:
+```rust
+source: "https://raw.githubusercontent.com/zyncx-protocol/circuits/main/init_vault.arcis"
+```
 
-#### 3. Arcium MXE Integration
-- [ ] Get Arcium MXE cluster address (contact Arcium team)
-- [ ] Implement actual CPI to `arcium::queue_computation`
-- [ ] Set up Arcium node callback authentication
-- [ ] Deploy Arcis confidential instruction code
+#### 3. Deploy to Devnet
+```bash
+arcium deploy \
+  --cluster-offset 456 \
+  --recovery-set-size 4 \
+  --keypair-path ~/.config/solana/id.json \
+  --rpc-url devnet \
+  --program-keypair target/deploy/zyncx-keypair.json \
+  --program-name zyncx
+```
 
-#### 4. Pyth Oracle Integration
-- [ ] Add real Pyth price feed account addresses
-- [ ] Implement price staleness checks
-- [ ] Add supported token price feeds (SOL, USDC, USDT, etc.)
+#### 4. Initialize Computation Definitions
+After deployment, call each init instruction once:
+```typescript
+await program.methods.initVaultCompDef().accounts({...}).rpc();
+await program.methods.initDepositCompDef().accounts({...}).rpc();
+await program.methods.initSwapCompDef().accounts({...}).rpc();
+await program.methods.initWithdrawalCompDef().accounts({...}).rpc();
+```
 
 ### Medium Priority
 
-#### 5. Security Hardening
-- [ ] Add rate limiting for deposits/withdrawals
-- [ ] Implement withdrawal delay (optional)
-- [ ] Add admin pause functionality
-- [ ] Audit ZK circuit constraints
+#### 5. Deploy Noir Verifier Program
+```bash
+solana program deploy mixer/target/mixer.so --program-id mixer/target/mixer-keypair.json
+```
 
-#### 6. Token Support
-- [ ] Deploy vaults for popular SPL tokens (USDC, USDT, etc.)
-- [ ] Add token metadata for frontend display
-- [ ] Test SPL token deposit/withdraw flows
+#### 6. Pyth Oracle Integration
+- [ ] Add real Pyth price feed account addresses
+- [ ] Implement price staleness checks
 
 ### Low Priority
 
 #### 7. Advanced Features
 - [ ] Confidential limit orders
-- [ ] Confidential DCA (Dollar Cost Averaging)
-- [ ] Relayer network for gas abstraction
-- [ ] Cross-chain bridges (Wormhole integration)
+- [ ] Confidential DCA
+- [ ] Relayer network
 
 ---
 
