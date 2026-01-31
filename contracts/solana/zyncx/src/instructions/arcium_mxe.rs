@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use arcium_anchor::prelude::*;
+use arcium_anchor::comp_def_offset;
 use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 use arcium_macros::circuit_hash;
 

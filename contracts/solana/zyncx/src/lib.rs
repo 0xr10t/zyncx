@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use arcium_anchor::prelude::*;
-use arcium_macros::comp_def_offset;
+// TODO: Re-enable when Arcium SDK is stabilized
+// use arcium_anchor::prelude::*;
 
 pub mod dex;
 pub mod errors;
@@ -12,7 +12,8 @@ use state::{SwapParam, ConfidentialSwapParams};
 
 declare_id!("HkwC2dfNAwgcsPtmMmwoD3AGXYMXJBwfY72WB9VMwDY5");
 
-#[arcium_program]
+// TODO: Re-enable #[arcium_program] when Arcium SDK is stabilized
+#[program]
 pub mod zyncx {
     use super::*;
 
@@ -85,6 +86,19 @@ pub mod zyncx {
         instructions::swap::handler_token(ctx, swap_param, nullifier, new_commitment, proof, swap_data)
     }
 
+    /// Cross-token swap (SOL → USDC, etc.) with ZK proof
+    /// Uses swap_circuit from Noir - nullifies in source vault, commits in destination vault
+    pub fn cross_token_swap<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CrossTokenSwap<'info>>,
+        swap_param: SwapParam,
+        nullifier: [u8; 32],
+        new_commitment: [u8; 32],
+        proof: Vec<u8>,
+        swap_data: Vec<u8>,
+    ) -> Result<()> {
+        instructions::swap::handler_cross_token(ctx, swap_param, nullifier, new_commitment, proof, swap_data)
+    }
+
     /// Check if a root exists in the merkle tree history
     /// Used by clients to verify their withdrawal proof will be accepted
     pub fn check_root(ctx: Context<CheckRoot>, root: [u8; 32]) -> Result<bool> {
@@ -131,75 +145,16 @@ pub mod zyncx {
     }
 
     // ========================================================================
-    // ARCIUM MXE INTEGRATION (New Three-Instruction Pattern)
+    // ARCIUM MXE INTEGRATION (Three-Instruction Pattern)
     // ========================================================================
-
-    // --- Computation Definition Initializers (one-time setup) ---
-
-    /// Initialize init_vault computation definition
-    pub fn init_vault_comp_def(ctx: Context<InitVaultCompDef>) -> Result<()> {
-        instructions::arcium_mxe::handler_init_vault_comp_def(ctx)
-    }
-
-    /// Initialize process_deposit computation definition
-    pub fn init_deposit_comp_def(ctx: Context<InitDepositCompDef>) -> Result<()> {
-        instructions::arcium_mxe::handler_init_deposit_comp_def(ctx)
-    }
-
-    /// Initialize confidential_swap computation definition
-    pub fn init_swap_comp_def(ctx: Context<InitSwapCompDef>) -> Result<()> {
-        instructions::arcium_mxe::handler_init_swap_comp_def(ctx)
-    }
-
-    /// Initialize compute_withdrawal computation definition
-    pub fn init_withdrawal_comp_def(ctx: Context<InitWithdrawalCompDef>) -> Result<()> {
-        instructions::arcium_mxe::handler_init_withdrawal_comp_def(ctx)
-    }
-
-    // --- Encrypted Vault Management ---
-
-    /// Create an encrypted vault account for MXE state storage
-    pub fn create_encrypted_vault(ctx: Context<CreateEncryptedVault>) -> Result<()> {
-        instructions::arcium_mxe::handler_create_encrypted_vault(ctx)
-    }
-
-    // --- Queue Computations ---
-
-    /// Queue an encrypted deposit to the MXE
-    /// User's deposit amount is encrypted; MXE processes without revealing it
-    pub fn queue_encrypted_deposit(
-        ctx: Context<QueueEncryptedDeposit>,
-        computation_offset: u64,
-        params: EncryptedDepositParams,
-    ) -> Result<()> {
-        instructions::arcium_mxe::handler_queue_encrypted_deposit(ctx, computation_offset, params)
-    }
-
-    /// Queue a confidential swap to the MXE
-    /// Trading bounds (min_out, slippage) are encrypted; execution is private
-    pub fn queue_confidential_swap_mxe(
-        ctx: Context<QueueConfidentialSwapMxe>,
-        computation_offset: u64,
-        params: ConfidentialSwapMxeParams,
-    ) -> Result<()> {
-        instructions::arcium_mxe::handler_queue_confidential_swap_mxe(ctx, computation_offset, params)
-    }
-
-    // --- Callbacks (called by MXE after computation) ---
-
-    /// Callback for deposit computation
-    pub fn deposit_callback(
-        ctx: Context<DepositCallback>,
-        output: SignedComputationOutputs<DepositOutput>,
-    ) -> Result<()> {
-        instructions::arcium_mxe::deposit_callback(ctx, output)
-    }
-
-    /// Callback for confidential swap computation
-    pub fn confidential_swap_callback_mxe(
-        ctx: Context<ConfidentialSwapCallbackMxe>,
-        output: SignedComputationOutputs<SwapOutput>,
-    ) -> Result<()> {
-        instructions::arcium_mxe::confidential_swap_callback(ctx, output)
-    }
+    // TODO: Re-enable after Arcium SDK stabilizes
+    // These instructions provide encrypted trading strategy execution.
+    // Commented out due to SDK compatibility issues.
+    //
+    // Available when re-enabled:
+    // - init_vault_comp_def, init_deposit_comp_def, init_swap_comp_def
+    // - create_encrypted_vault
+    // - queue_encrypted_deposit, queue_confidential_swap_mxe
+    // - deposit_callback, confidential_swap_callback_mxe
+    // ========================================================================
 }

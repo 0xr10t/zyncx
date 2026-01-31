@@ -117,16 +117,21 @@ system_program::transfer(
 Every deposit creates a **commitment** that hides the deposit details:
 
 ```
-commitment = Poseidon(secret, nullifier_secret, amount)
+commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
 ```
 
 | Component | Description | Privacy Role |
-|-----------|-------------|--------------|
+|-----------|-------------|---------------|
 | `secret` | Random 256-bit value | Proves ownership |
 | `nullifier_secret` | Random 256-bit value | Prevents double-spend |
 | `amount` | Deposit amount in lamports | Binds value to commitment |
+| `token_mint` | Token mint address (32 bytes) | **NEW**: Binds to specific vault |
 
-The commitment is inserted into the on-chain Merkle tree. The tree root changes, but observers only see "a new leaf was added" without knowing its value.
+The commitment is inserted into the on-chain Merkle tree **for that token's vault**. Each token (SOL, USDC, etc.) has its own vault with a separate Merkle tree.
+
+**Why include token_mint?**
+- Prevents cross-vault attacks (can't use SOL proof to withdraw USDC)
+- Enables cross-token swaps with separate nullification and commitment
 
 ### 2. Merkle Tree Membership
 
@@ -163,12 +168,12 @@ nullifier_hash = Poseidon(nullifier_secret)
 Zyncx supports withdrawing part of your balance:
 
 ```
-BEFORE: Commitment A = Poseidon(secret_A, null_A, 10 SOL)
+BEFORE: Commitment A = Poseidon(secret_A, null_A, 10 SOL, SOL_MINT)
 
 WITHDRAW 3 SOL:
   - Reveal: nullifier_hash_A (marks commitment A as spent)
   - Receive: 3 SOL
-  - Create: Commitment B = Poseidon(secret_B, null_B, 7 SOL)  ← NEW secrets!
+  - Create: Commitment B = Poseidon(secret_B, null_B, 7 SOL, SOL_MINT)  ← NEW secrets!
   
 AFTER: Commitment A is spent, Commitment B is live with 7 SOL
 ```
@@ -177,10 +182,46 @@ The ZK circuit verifies:
 1. You know the secrets for commitment A
 2. Commitment A has at least 3 SOL
 3. The new commitment B is correctly formed with (original - withdrawal) amount
+4. **Token mint matches** (commitment stays in same vault)
 
-### 5. Arcium MXE (Multi-Party Computation)
+### 5. Cross-Token Swaps (NEW)
 
-All trading logic runs inside Arcium's encrypted execution environment:
+Zyncx supports swapping between different tokens while maintaining privacy:
+
+```
+BEFORE: 
+  SOL Vault: Commitment A = Poseidon(secret_A, null_A, 10 SOL, SOL_MINT)
+  USDC Vault: Empty
+
+SWAP 10 SOL → 1000 USDC via Jupiter:
+  - Generate ZK proof using swap_circuit()
+  - Reveal: src_nullifier_hash (marks SOL commitment as spent)
+  - Execute: Jupiter swap (10 SOL → 1000 USDC)
+  - Create: Commitment B = Poseidon(secret_B, null_B, 1000 USDC, USDC_MINT)
+  - Insert: Commitment B into USDC vault's Merkle tree
+  
+AFTER:
+  SOL Vault: Commitment A is nullified
+  USDC Vault: Commitment B is live with 1000 USDC
+```
+
+**Key insight:** The swap_circuit proves:
+1. User owns source commitment (SOL)
+2. Destination commitment is correctly formed (USDC)
+3. Slippage protection is satisfied (`dst_amount >= min_dst_amount`)
+
+**Privacy preserved:**
+- No link between SOL deposit and USDC withdrawal
+- Swap parameters (slippage) are private in the ZK proof
+- Only nullifier and new commitment are revealed publicly
+
+### 6. Arcium MXE (Multi-Party Computation) - PENDING
+
+> **Note:** Arcium SDK integration is temporarily paused due to compatibility issues.
+> The architecture is designed and code exists in `arcium_mxe.rs`, but it's disabled
+> until the SDK stabilizes.
+
+When enabled, trading logic will run inside Arcium's encrypted execution environment:
 
 ```
 USER → Encrypted Inputs → [ARCIUM MXE] → Encrypted Outputs → USER
@@ -310,6 +351,7 @@ zyncx/
 secret: Field                      // Original deposit secret
 nullifier_secret: Field            // Original nullifier secret
 original_amount: Field             // Full commitment amount
+token_mint: Field                  // Token mint address (NEW)
 merkle_path: [Field; 20]           // Sibling hashes
 path_indices: [Field; 20]          // Left/right indicators
 new_secret: Field                  // Fresh secret for change
@@ -321,7 +363,28 @@ nullifier_hash: Field              // Marks old commitment spent
 recipient: Field                   // Withdrawal recipient
 withdraw_amount: Field             // Amount being withdrawn
 new_commitment: Field              // Change commitment (or 0)
+token_mint_public: Field           // Must match private token_mint (NEW)
 ```
+
+**Cross-Token Swap Circuit (NEW):**
+```noir
+fn swap_circuit(
+    // Source commitment (being spent)
+    src_secret, src_nullifier_secret, src_amount, src_token_mint,
+    merkle_path, path_indices,
+    // Destination commitment (being created)
+    dst_secret, dst_nullifier_secret, dst_amount,
+    // Public inputs
+    src_root, src_nullifier_hash,
+    src_token_mint_public, dst_token_mint_public,
+    dst_commitment, min_dst_amount,
+)
+```
+
+This circuit enables **SOL → USDC** swaps by:
+1. Nullifying the source commitment in the SOL vault
+2. Creating a new commitment in the USDC vault
+3. Enforcing slippage protection (`dst_amount >= min_dst_amount`)
 
 #### Frontend (`app/`)
 

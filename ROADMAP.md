@@ -24,17 +24,26 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that enables:
 | Withdraw Instructions | ✅ Done | `contracts/solana/zyncx/src/instructions/withdraw.rs` |
 | Jupiter DEX Integration | ✅ Done | `contracts/solana/zyncx/src/dex/jupiter.rs` |
 
-### Phase 2: Arcium MXE Integration (NEW - Three-Instruction Pattern)
+### Phase 2: Arcium MXE Integration (PAUSED - SDK Compatibility Issues)
 | Component | Status | Location |
-|-----------|--------|----------|
+|-----------|--------|---------|
 | Arcis MPC Circuits | ✅ Done | `encrypted-ixs/src/lib.rs` |
 | Encrypted State Accounts | ✅ Done | `contracts/solana/zyncx/src/state/arcium_mxe.rs` |
-| Computation Def Initializers | ✅ Done | `init_vault_comp_def`, `init_deposit_comp_def`, etc. |
-| Queue Encrypted Deposit | ✅ Done | `queue_encrypted_deposit` with ArgBuilder |
-| Queue Confidential Swap MXE | ✅ Done | `queue_confidential_swap_mxe` with ArgBuilder |
-| Deposit Callback | ✅ Done | `deposit_callback` with SignedComputationOutputs |
-| Swap Callback | ✅ Done | `confidential_swap_callback_mxe` |
-| Anchor 0.32.1 + Arcium 0.6.3 | ✅ Done | `Cargo.toml` updated |
+| Computation Def Initializers | ⏸️ Paused | Disabled until SDK stabilizes |
+| Queue Encrypted Deposit | ⏸️ Paused | `arcium_mxe.rs` commented out |
+| Queue Confidential Swap MXE | ⏸️ Paused | `arcium_mxe.rs` commented out |
+| Anchor 0.32.1 | ✅ Done | `Cargo.toml` updated |
+| Arcium 0.6.3 | ⚠️ Issues | Dependency conflicts, module disabled |
+
+### Phase 3: Multi-Token Cross-Vault Swaps (NEW - COMPLETED)
+| Component | Status | Location |
+|-----------|--------|---------|
+| Multi-token commitment format | ✅ Done | `mixer/src/main.nr` - `hash_4` with token_mint |
+| Cross-token swap circuit | ✅ Done | `swap_circuit()` in `main.nr` |
+| Dual-vault nullifier system | ✅ Done | Nullify in source, commit in destination |
+| Cross-token swap instruction | ✅ Done | `cross_token_swap` in `lib.rs` |
+| Slippage protection in circuit | ✅ Done | `assert(dst_amount >= min_dst_amount)` |
+| 9 Noir tests passing | ✅ Done | `nargo test` |
 
 ### Arcium Integration Architecture
 ```
@@ -83,52 +92,56 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that enables:
 
 ### High Priority
 
-#### 1. Build and Test with Arcium CLI
+#### 1. Deploy Noir Verifier Program
 ```bash
-# Use arcium CLI instead of anchor build
-arcium build                    # Compiles circuits + program
-arcium test                     # Starts local ARX nodes + runs tests
-arcium test --cluster devnet    # Test on devnet
+# Compile the updated multi-token circuit
+cd mixer && nargo compile && nargo codegen
+
+# Deploy verifier to Solana
+solana program deploy mixer/target/mixer.so --program-id mixer/target/mixer-keypair.json
 ```
 
-#### 2. Deploy Circuits to GitHub
-```bash
-# Upload compiled .arcis files to circuits repo
-cp build/*.arcis /path/to/zyncx-circuits-repo/
-cd /path/to/zyncx-circuits-repo
-git add . && git commit -m "Add circuits" && git push
-```
-Update circuit URLs in `arcium_mxe.rs`:
-```rust
-source: "https://raw.githubusercontent.com/zyncx-protocol/circuits/main/init_vault.arcis"
-```
+#### 2. Update Frontend for Multi-Token
+- Add token selector (SOL, USDC, etc.) to deposit/withdraw UI
+- Update commitment generation to include `token_mint`
+- Add cross-token swap UI with slippage settings
+- Store token_mint in local note data
 
-#### 3. Deploy to Devnet
+#### 3. Integrate groth16-solana Verifier
 ```bash
-arcium deploy \
-  --cluster-offset 456 \
-  --recovery-set-size 4 \
-  --keypair-path ~/.config/solana/id.json \
-  --rpc-url devnet \
-  --program-keypair target/deploy/zyncx-keypair.json \
-  --program-name zyncx
-```
-
-#### 4. Initialize Computation Definitions
-After deployment, call each init instruction once:
-```typescript
-await program.methods.initVaultCompDef().accounts({...}).rpc();
-await program.methods.initDepositCompDef().accounts({...}).rpc();
-await program.methods.initSwapCompDef().accounts({...}).rpc();
-await program.methods.initWithdrawalCompDef().accounts({...}).rpc();
+# The ZK proof verification is currently a placeholder
+# Need to implement actual Groth16 verification on-chain
+# Options: groth16-solana crate or Sunspot program
 ```
 
 ### Medium Priority
 
-#### 5. Deploy Noir Verifier Program
-```bash
-solana program deploy mixer/target/mixer.so --program-id mixer/target/mixer-keypair.json
+#### 4. Fix Arcium SDK Integration
+The Arcium SDK (0.6.3) has compatibility issues with Anchor 0.32.1:
+- `ArciumDeserialize` trait conflicts
+- `comp_def_offset` macro import issues
+- Callback output type serialization problems
+
+**When Arcium SDK stabilizes, re-enable:**
+```rust
+// In lib.rs
+use arcium_anchor::prelude::*;
+#[arcium_program]
+
+// In instructions/mod.rs
+pub mod arcium_mxe;
+pub use arcium_mxe::*;
 ```
+
+#### 5. Deploy to Devnet
+```bash
+anchor deploy --provider.cluster devnet
+```
+
+#### 6. Pyth Oracle Integration
+- [ ] Add real Pyth price feed account addresses
+- [ ] Implement price staleness checks
+- [ ] Use oracle prices for swap slippage validation
 
 #### 6. Pyth Oracle Integration
 - [ ] Add real Pyth price feed account addresses
@@ -211,16 +224,19 @@ export function generateDepositSecrets() {
   return { secret, nullifierSecret };
 }
 
-// Compute commitment = Poseidon(secret, nullifier_secret, amount)
+// Compute commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+// NEW: Now includes token_mint for multi-token support
 export function computeCommitment(
   secret: Uint8Array,
   nullifierSecret: Uint8Array,
-  amount: bigint
+  amount: bigint,
+  tokenMint: Uint8Array  // NEW: 32-byte token mint address
 ): Uint8Array {
   const hash = poseidon([
     BigInt('0x' + Buffer.from(secret).toString('hex')),
     BigInt('0x' + Buffer.from(nullifierSecret).toString('hex')),
-    amount
+    amount,
+    BigInt('0x' + Buffer.from(tokenMint).toString('hex'))  // NEW
   ]);
   return bigintToBytes32(hash);
 }
@@ -233,7 +249,7 @@ export function computeNullifierHash(nullifierSecret: Uint8Array): Uint8Array {
   return bigintToBytes32(hash);
 }
 
-// Compute precommitment for deposit (amount bound later)
+// Compute precommitment for deposit (amount and token bound later)
 export function computePrecommitment(
   secret: Uint8Array,
   nullifierSecret: Uint8Array
@@ -274,13 +290,19 @@ export interface WithdrawProofInputs {
   // Private inputs
   secret: Uint8Array;
   nullifierSecret: Uint8Array;
+  originalAmount: bigint;          // Full commitment amount
+  tokenMint: Uint8Array;           // NEW: Token mint address
   merklePath: Uint8Array[];
   pathIndices: number[];
+  newSecret: Uint8Array;           // For partial withdrawal
+  newNullifierSecret: Uint8Array;  // For partial withdrawal
   // Public inputs
   root: Uint8Array;
   nullifierHash: Uint8Array;
   recipient: Uint8Array;
-  amount: bigint;
+  withdrawAmount: bigint;
+  newCommitment: Uint8Array;       // Change commitment (or zeros)
+  tokenMintPublic: Uint8Array;     // NEW: Must match private tokenMint
 }
 
 export async function generateWithdrawProof(inputs: WithdrawProofInputs): Promise<Uint8Array> {

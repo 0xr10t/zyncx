@@ -10,8 +10,20 @@
 |---------|------------|---------------|
 | Shielded Deposits | Noir ZK Proofs | Deposit amounts, depositor identity |
 | Private Withdrawals | Noir ZK Proofs | Withdrawal amounts, link to deposits |
-| Confidential Swaps | Arcium MPC | Trading strategy, slippage tolerance |
-| Hidden Limit Orders | Arcium MPC | Target price, order size |
+| **Cross-Token Swaps** | Noir ZK Proofs | Source/destination link via dual-vault nullifier system |
+| Confidential Swaps | Arcium MPC (pending) | Trading strategy, slippage tolerance |
+| Hidden Limit Orders | Arcium MPC (pending) | Target price, order size |
+
+### Multi-Token Architecture (NEW)
+
+**Commitment Format:**
+```
+commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+```
+
+- Each token has its own vault with a separate Merkle tree
+- Cross-token swaps: nullify in source vault, commit in destination vault
+- Token mint is part of commitment to prevent cross-vault attacks
 
 ---
 
@@ -66,18 +78,15 @@ deposit_native         // Deposit SOL with commitment
 deposit_token          // Deposit SPL token with commitment
 withdraw_native        // Withdraw SOL with ZK proof
 withdraw_token         // Withdraw SPL token with ZK proof
-swap_native            // Swap via Jupiter with ZK proof
-swap_token             // Swap tokens via Jupiter
+swap_native            // Swap within same vault via Jupiter
+swap_token             // Swap tokens within same vault
+cross_token_swap       // Cross-token swap (SOL <-> USDC) with dual-vault proof
 
-// Phase 2: Arcium MXE operations
-init_vault_comp_def    // Initialize MPC circuit definition
-init_deposit_comp_def  // Initialize deposit circuit
-init_swap_comp_def     // Initialize swap circuit
-create_encrypted_vault // Create MXE-encrypted vault
-queue_encrypted_deposit// Queue deposit to MPC cluster
-queue_confidential_swap_mxe // Queue swap to MPC cluster
-deposit_callback       // Receive MPC results
-confidential_swap_callback_mxe // Receive swap results
+// Phase 2: Arcium MXE operations (PENDING - SDK Stabilization)
+// Temporarily disabled due to Arcium SDK compatibility issues
+// init_vault_comp_def    // Initialize MPC circuit definition
+// queue_encrypted_deposit// Queue deposit to MPC cluster
+// confidential_swap_callback_mxe // Receive swap results
 ```
 
 ---
@@ -195,8 +204,9 @@ NullifierAlreadySpent, InvalidZKProof, RootNotFound
 
 // Swap Errors
 InvalidSwapRouter, SlippageExceeded, SwapExecutionFailed
+SameVaultSwap, TokenMintMismatch  // NEW: Cross-token swap errors
 
-// Arcium Errors
+// Arcium Errors (pending SDK stabilization)
 ClusterNotSet, AbortedComputation, InvalidMXEAccount
 CorruptedEncryptedState, InvalidEncryptionParams
 ```
@@ -207,24 +217,65 @@ CorruptedEncryptedState, InvalidEncryptionParams
 
 **Purpose:** Prove ownership of shielded funds without revealing deposit details.
 
+#### Main Circuit (Withdrawal - Same Token)
+
 ```noir
 fn main(
     // Private inputs (user knows, verifier doesn't)
     secret: Field,
     nullifier_secret: Field,
-    merkle_path: [Field; TREE_DEPTH],  // 20 levels
+    original_amount: Field,
+    token_mint: Field,                  // NEW: Token mint address
+    merkle_path: [Field; TREE_DEPTH],   // 20 levels
     path_indices: [Field; TREE_DEPTH],
+    new_secret: Field,                  // For partial withdrawal change
+    new_nullifier_secret: Field,
 
     // Public inputs (verified on-chain)
-    root: pub Field,           // Merkle root
-    nullifier_hash: pub Field, // Prevents double-spend
-    recipient: pub Field,      // Prevents front-running
-    amount: pub Field,
+    root: pub Field,                    // Merkle root
+    nullifier_hash: pub Field,          // Prevents double-spend
+    recipient: pub Field,               // Prevents front-running
+    withdraw_amount: pub Field,
+    new_commitment: pub Field,          // Change commitment (0 if full)
+    token_mint_public: pub Field,       // NEW: Must match private token_mint
 ) {
-    // 1. Compute commitment = Poseidon(secret, nullifier_secret, amount)
-    // 2. Verify nullifier = Poseidon(nullifier_secret)
-    // 3. Verify Merkle membership (commitment is in tree)
-    // 4. Constrain recipient ≠ 0
+    // 1. Verify token_mint == token_mint_public (prevents cross-vault attacks)
+    // 2. Compute commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+    // 3. Verify nullifier = Poseidon(nullifier_secret)
+    // 4. Verify Merkle membership (commitment is in tree)
+    // 5. Verify new_commitment for remaining balance
+}
+```
+
+#### Swap Circuit (Cross-Token Exchange) - NEW
+
+```noir
+fn swap_circuit(
+    // Source commitment (being spent)
+    src_secret: Field,
+    src_nullifier_secret: Field,
+    src_amount: Field,
+    src_token_mint: Field,
+    merkle_path: [Field; TREE_DEPTH],
+    path_indices: [Field; TREE_DEPTH],
+    
+    // Destination commitment (being created)
+    dst_secret: Field,
+    dst_nullifier_secret: Field,
+    dst_amount: Field,
+    
+    // Public inputs
+    src_root: Field,
+    src_nullifier_hash: Field,
+    src_token_mint_public: Field,
+    dst_token_mint_public: Field,
+    dst_commitment: Field,
+    min_dst_amount: Field,             // Slippage protection
+) {
+    // 1. Verify source token mint matches
+    // 2. Verify source commitment ownership (Merkle proof)
+    // 3. Verify destination commitment correctly formed
+    // 4. Enforce slippage: dst_amount >= min_dst_amount
 }
 ```
 

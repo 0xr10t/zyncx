@@ -141,4 +141,17 @@ pub enum ZyncxError {
 
     #[msg("Invalid encryption parameters")]
     InvalidEncryptionParams,
+
+    // ========================================================================
+    // Cross-Token Swap Errors
+    // ========================================================================
+
+    #[msg("Cannot swap within same vault - use withdraw instead")]
+    SameVaultSwap,
+
+    #[msg("Token mint does not match vault")]
+    TokenMintMismatch,
+
+    #[msg("Destination vault not found")]
+    DestinationVaultNotFound,
 }
