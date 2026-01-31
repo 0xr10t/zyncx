@@ -112,8 +112,15 @@ pub fn handler_native(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial withdrawals, insert new commitment for remaining balance
+    // If new_commitment is all zeros, it's a full withdrawal - no change to insert
+    let is_partial_withdrawal = new_commitment != [0u8; 32];
+    if is_partial_withdrawal {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial withdrawal: inserted change commitment into merkle tree");
+    } else {
+        msg!("Full withdrawal: no change commitment needed");
+    }
 
     // Transfer SOL from vault treasury to recipient
     let treasury_lamports = ctx.accounts.vault_treasury.lamports();
@@ -128,9 +135,10 @@ pub fn handler_native(
         amount,
         nullifier,
         new_commitment,
+        is_partial: is_partial_withdrawal,
     });
 
-    msg!("Withdrawn {} lamports", amount);
+    msg!("Withdrawn {} lamports (partial: {})", amount, is_partial_withdrawal);
 
     Ok(())
 }
@@ -245,8 +253,14 @@ pub fn handler_token(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial withdrawals, insert new commitment for remaining balance
+    let is_partial_withdrawal = new_commitment != [0u8; 32];
+    if is_partial_withdrawal {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial withdrawal: inserted change commitment into merkle tree");
+    } else {
+        msg!("Full withdrawal: no change commitment needed");
+    }
 
     // Transfer tokens from vault to recipient
     let vault_key = vault.key();
@@ -277,9 +291,10 @@ pub fn handler_token(
         amount,
         nullifier,
         new_commitment,
+        is_partial: is_partial_withdrawal,
     });
 
-    msg!("Withdrawn {} tokens", amount);
+    msg!("Withdrawn {} tokens (partial: {})", amount, is_partial_withdrawal);
 
     Ok(())
 }
@@ -292,4 +307,5 @@ pub struct WithdrawnEvent {
     pub amount: u64,
     pub nullifier: [u8; 32],
     pub new_commitment: [u8; 32],
+    pub is_partial: bool,
 }

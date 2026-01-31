@@ -96,8 +96,12 @@ pub fn handler_native<'info>(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial swaps, insert new commitment for remaining balance
+    let is_partial = new_commitment != [0u8; 32];
+    if is_partial {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial swap: inserted change commitment into merkle tree");
+    }
 
     // Check if this is a direct transfer (same token) or a swap
     let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
@@ -228,8 +232,12 @@ pub fn handler_token<'info>(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial swaps, insert new commitment for remaining balance
+    let is_partial = new_commitment != [0u8; 32];
+    if is_partial {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial swap: inserted change commitment into merkle tree");
+    }
 
     // Check if this is a direct transfer (same token) or a swap
     let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
