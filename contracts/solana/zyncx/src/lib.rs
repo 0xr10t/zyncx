@@ -85,18 +85,8 @@ pub mod zyncx {
         instructions::swap::handler_token(ctx, swap_param, nullifier, new_commitment, proof, swap_data)
     }
 
-    /// Verify a ZK proof without executing withdrawal
-    pub fn verify_proof(
-        ctx: Context<VerifyProof>,
-        amount: u64,
-        nullifier: [u8; 32],
-        new_commitment: [u8; 32],
-        proof: Vec<u8>,
-    ) -> Result<bool> {
-        instructions::verify::handler(ctx, amount, nullifier, new_commitment, proof)
-    }
-
     /// Check if a root exists in the merkle tree history
+    /// Used by clients to verify their withdrawal proof will be accepted
     pub fn check_root(ctx: Context<CheckRoot>, root: [u8; 32]) -> Result<bool> {
         instructions::verify::check_root_exists(ctx, root)
     }
