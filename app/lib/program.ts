@@ -4,7 +4,7 @@ import { AnchorProvider, Program, Idl, BN, Wallet } from '@coral-xyz/anchor';
 import idl from '../../../target/idl/zyncx.json';
 
 // Program ID - deployed on devnet
-export const PROGRAM_ID = new PublicKey('6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6');
+export const PROGRAM_ID = new PublicKey('4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT');
 
 // Native SOL mint (zero pubkey represents SOL in our system)
 export const NATIVE_MINT = new PublicKey(new Uint8Array(32));

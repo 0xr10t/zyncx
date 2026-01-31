@@ -2,8 +2,8 @@ import { Connection, Keypair, PublicKey, SystemProgram, Transaction, Transaction
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Program ID
-const PROGRAM_ID = new PublicKey('6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6');
+// Program ID (deployed on devnet)
+const PROGRAM_ID = new PublicKey('4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT');
 const NATIVE_MINT = new PublicKey(new Uint8Array(32)); // Zero pubkey for SOL
 
 async function main() {
