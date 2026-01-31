@@ -110,8 +110,8 @@ pub fn transfer_sol_from_treasury<'info>(
     vault_treasury: &AccountInfo<'info>,
     recipient: &AccountInfo<'info>,
     amount: u64,
-    vault_key: &Pubkey,
-    treasury_bump: u8,
+    _vault_key: &Pubkey,
+    _treasury_bump: u8,
 ) -> Result<()> {
     // Verify sufficient balance
     let treasury_balance = vault_treasury.lamports();
@@ -164,11 +164,11 @@ pub fn transfer_tokens_from_vault<'info>(
 /// This wraps SOL to WSOL, executes the swap, then unwraps if needed
 pub fn swap_sol_to_token<'info>(
     vault_treasury: &AccountInfo<'info>,
-    wsol_account: &AccountInfo<'info>,
+    _wsol_account: &AccountInfo<'info>,
     destination_token_account: &AccountInfo<'info>,
     jupiter_program: &AccountInfo<'info>,
-    token_program: &AccountInfo<'info>,
-    swap_route: &SwapRoute,
+    _token_program: &AccountInfo<'info>,
+    _swap_route: &SwapRoute,
     swap_data: Vec<u8>,
     remaining_accounts: &[AccountInfo<'info>],
     vault_key: &Pubkey,
@@ -193,11 +193,11 @@ pub fn swap_sol_to_token<'info>(
 /// Swap SPL token to SOL via Jupiter  
 pub fn swap_token_to_sol<'info>(
     vault_token_account: &AccountInfo<'info>,
-    wsol_account: &AccountInfo<'info>,
+    _wsol_account: &AccountInfo<'info>,
     recipient: &AccountInfo<'info>,
     jupiter_program: &AccountInfo<'info>,
-    token_program: &AccountInfo<'info>,
-    swap_route: &SwapRoute,
+    _token_program: &AccountInfo<'info>,
+    _swap_route: &SwapRoute,
     swap_data: Vec<u8>,
     remaining_accounts: &[AccountInfo<'info>],
     vault_key: &Pubkey,
@@ -224,7 +224,7 @@ pub fn swap_token_to_token<'info>(
     vault_token_account: &AccountInfo<'info>,
     destination_token_account: &AccountInfo<'info>,
     jupiter_program: &AccountInfo<'info>,
-    swap_route: &SwapRoute,
+    _swap_route: &SwapRoute,
     swap_data: Vec<u8>,
     remaining_accounts: &[AccountInfo<'info>],
     vault_key: &Pubkey,

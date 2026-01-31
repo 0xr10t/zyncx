@@ -301,7 +301,7 @@ pub fn handler_confidential_swap_callback<'info>(
     request_id: u64,
     computation_success: bool,
     encrypted_result: Vec<u8>,
-    node_signature: [u8; 64],
+    _node_signature: [u8; 64],
     swap_data: Vec<u8>,
 ) -> Result<()> {
     let computation_request = &mut ctx.accounts.computation_request;

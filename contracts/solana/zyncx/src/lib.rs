@@ -8,7 +8,7 @@ pub mod state;
 use instructions::*;
 use state::{SwapParam, ConfidentialSwapParams};
 
-declare_id!("6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6");
+declare_id!("4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT");
 
 #[program]
 pub mod zyncx {

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use light_poseidon::{Poseidon, PoseidonBytesHasher};
-use ark_bn254::Fr;
+// Note: light_poseidon and ark_bn254 removed due to zeroize version conflict with solana-program
+// Using keccak-based hashing for demo - production would use groth16-solana compatible implementation
 
 pub const MAX_DEPTH: u32 = 20;
 pub const ROOT_HISTORY_SIZE: usize = 30;
@@ -135,16 +135,12 @@ pub fn simple_hash(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
     Ok(keccak::hash(&combined).to_bytes())
 }
 
-/// Poseidon hash for commitment generation (ZK-friendly)
+/// Hash two values (using keccak for demo - production would use Poseidon)
 #[inline(never)]
 pub fn poseidon_hash_two(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
-    let mut hasher = Poseidon::<Fr>::new_circom(2)
-        .map_err(|_| crate::errors::ZyncxError::PoseidonHashFailed)?;
-    
-    let result = hasher.hash_bytes_be(&[left.as_slice(), right.as_slice()])
-        .map_err(|_| crate::errors::ZyncxError::PoseidonHashFailed)?;
-    
-    Ok(result)
+    // Using keccak instead of Poseidon due to dependency conflicts
+    // In production with real ZK proofs, use light_poseidon with compatible solana version
+    simple_hash(left, right)
 }
 
 /// Hash commitment using keccak (for testing - uses less stack)
@@ -160,13 +156,12 @@ pub fn poseidon_hash_commitment(amount: u64, precommitment: [u8; 32]) -> Result<
     Ok(keccak::hash(&data).to_bytes())
 }
 
-/// Hash commitment using Poseidon (ZK-friendly, for production with real ZK proofs)
-/// WARNING: This may cause stack overflow on Solana due to Poseidon's stack usage
+/// Hash commitment (ZK-compatible placeholder)
+/// In production with real ZK proofs, use light_poseidon with compatible solana version
 #[inline(never)]
 #[allow(dead_code)]
 pub fn poseidon_hash_commitment_zk(amount: u64, precommitment: [u8; 32]) -> Result<[u8; 32]> {
-    let mut amount_bytes = [0u8; 32];
-    amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
-    
-    poseidon_hash_two(&amount_bytes, &precommitment)
+    // Using keccak-based hash due to dependency conflicts
+    // Production would use Poseidon for ZK circuit compatibility
+    poseidon_hash_commitment(amount, precommitment)
 }
