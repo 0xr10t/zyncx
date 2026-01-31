@@ -19,7 +19,17 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 [dependencies]
 anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
 anchor-spl = { version = "0.32.1", features = ["token", "associated_token"] }
-light-poseidon = "0.2.0"
-ark-bn254 = "0.4.0"
-ark-ff = "0.4.0"
 bytemuck = { version = "1.14", features = ["derive"] }
+solana-keccak-hasher = "2.2"
+
+# Poseidon hashing disabled due to stack overflow on Solana
+# Commitment computation and Merkle proofs are done off-chain (client-side)
+# On-chain we use keccak256 for tracking, ZK proofs provide cryptographic security
+# light-poseidon = "0.2.0"
+# ark-bn254 = "0.4.0"
+# ark-ff = "0.4.0"
+
+# Arcium SDK for MPC computation (DISABLED - requires Rust 1.85+ for edition2024)
+# arcium-anchor = "0.6.3"
+# arcium-client = "0.6.3"
+# arcium-macros = "0.6.3"

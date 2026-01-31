@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-// TODO: Re-enable when Arcium SDK is stabilized
+// Arcium SDK disabled - requires Rust 1.85+ for edition2024 support
 // use arcium_anchor::prelude::*;
 
 pub mod dex;
@@ -23,21 +23,23 @@ pub mod zyncx {
     }
 
     /// Deposit native SOL into the vault
+    /// Client computes commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
     pub fn deposit_native(
         ctx: Context<DepositNative>,
         amount: u64,
-        precommitment: [u8; 32],
+        commitment: [u8; 32],
     ) -> Result<[u8; 32]> {
-        instructions::deposit::handler_native(ctx, amount, precommitment)
+        instructions::deposit::handler_native(ctx, amount, commitment)
     }
 
     /// Deposit SPL tokens into the vault
+    /// Client computes commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
     pub fn deposit_token(
         ctx: Context<DepositToken>,
         amount: u64,
-        precommitment: [u8; 32],
+        commitment: [u8; 32],
     ) -> Result<[u8; 32]> {
-        instructions::deposit::handler_token(ctx, amount, precommitment)
+        instructions::deposit::handler_token(ctx, amount, commitment)
     }
 
     /// Withdraw native SOL from the vault with ZK proof

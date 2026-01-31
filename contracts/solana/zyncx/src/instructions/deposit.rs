@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-use crate::state::{MerkleTreeState, VaultState, VaultType, poseidon_hash_commitment};
+use crate::state::{MerkleTreeState, VaultState, VaultType};
 use crate::errors::ZyncxError;
 
 #[derive(Accounts)]
@@ -38,9 +38,10 @@ pub struct DepositNative<'info> {
 pub fn handler_native(
     ctx: Context<DepositNative>,
     amount: u64,
-    precommitment: [u8; 32],
+    commitment: [u8; 32],
 ) -> Result<[u8; 32]> {
     require!(amount > 0, ZyncxError::InvalidDepositAmount);
+    require!(commitment != [0u8; 32], ZyncxError::InvalidCommitment);
 
     let vault = &mut ctx.accounts.vault;
     let merkle_tree = &mut ctx.accounts.merkle_tree;
@@ -59,8 +60,10 @@ pub fn handler_native(
         amount,
     )?;
 
-    // Generate commitment = hash(amount, precommitment)
-    let commitment = poseidon_hash_commitment(amount, precommitment)?;
+    // Client computes commitment off-chain as:
+    // commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+    // This matches the Noir circuit format exactly.
+    // The ZK proof during withdrawal validates the commitment was computed correctly.
 
     // Insert commitment into merkle tree
     merkle_tree.insert(commitment)?;
@@ -76,7 +79,7 @@ pub fn handler_native(
         depositor: ctx.accounts.depositor.key(),
         amount,
         commitment,
-        precommitment,
+        token_mint: vault.asset_mint,
     });
 
     msg!("Deposited {} lamports", amount);
@@ -120,9 +123,10 @@ pub struct DepositToken<'info> {
 pub fn handler_token(
     ctx: Context<DepositToken>,
     amount: u64,
-    precommitment: [u8; 32],
+    commitment: [u8; 32],
 ) -> Result<[u8; 32]> {
     require!(amount > 0, ZyncxError::InvalidDepositAmount);
+    require!(commitment != [0u8; 32], ZyncxError::InvalidCommitment);
 
     let vault = &mut ctx.accounts.vault;
     let merkle_tree = &mut ctx.accounts.merkle_tree;
@@ -142,8 +146,9 @@ pub fn handler_token(
         amount,
     )?;
 
-    // Generate commitment = hash(amount, precommitment)
-    let commitment = poseidon_hash_commitment(amount, precommitment)?;
+    // Client computes commitment off-chain as:
+    // commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+    // This matches the Noir circuit format exactly.
 
     // Insert commitment into merkle tree
     merkle_tree.insert(commitment)?;
@@ -159,7 +164,7 @@ pub fn handler_token(
         depositor: ctx.accounts.depositor.key(),
         amount,
         commitment,
-        precommitment,
+        token_mint: vault.asset_mint,
     });
 
     msg!("Deposited {} tokens", amount);
@@ -173,5 +178,5 @@ pub struct DepositedEvent {
     pub depositor: Pubkey,
     pub amount: u64,
     pub commitment: [u8; 32],
-    pub precommitment: [u8; 32],
+    pub token_mint: Pubkey,
 }

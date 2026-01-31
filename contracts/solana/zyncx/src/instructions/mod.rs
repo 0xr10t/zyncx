@@ -4,8 +4,7 @@ pub mod withdraw;
 pub mod swap;
 pub mod verify;
 pub mod confidential;
-// TODO: Re-enable after Arcium SDK stabilizes
-// pub mod arcium_mxe;
+// pub mod arcium_mxe; // Disabled - requires Arcium SDK (Rust 1.85+)
 
 pub use initialize::*;
 pub use deposit::*;

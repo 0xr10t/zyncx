@@ -70,7 +70,13 @@ pub fn handler_native(
     let root = merkle_tree.get_root();
 
     // Verify ZK proof via CPI to verifier program
-    // Circuit expects public inputs: [root, nullifier_hash, recipient, amount]
+    // Noir circuit expects 6 public inputs (in order):
+    // 1. root: Field
+    // 2. nullifier_hash: Field  
+    // 3. recipient: Field
+    // 4. withdraw_amount: Field
+    // 5. new_commitment: Field
+    // 6. token_mint_public: Field
     let mut verifier_input = Vec::new();
     
     // 1. Append proof bytes
@@ -85,10 +91,16 @@ pub fn handler_native(
     // 4. Public Input: Recipient (32 bytes)
     verifier_input.extend_from_slice(&ctx.accounts.recipient.key().to_bytes());
     
-    // 5. Public Input: Amount (32 bytes, Big Endian)
+    // 5. Public Input: Withdraw Amount (32 bytes, Big Endian)
     let mut amount_bytes = [0u8; 32];
     amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
     verifier_input.extend_from_slice(&amount_bytes);
+    
+    // 6. Public Input: New Commitment (32 bytes)
+    verifier_input.extend_from_slice(&new_commitment);
+    
+    // 7. Public Input: Token Mint (32 bytes)
+    verifier_input.extend_from_slice(&vault.asset_mint.to_bytes());
     
     // Invoke verifier program
     let instruction = Instruction {
@@ -97,7 +109,7 @@ pub fn handler_native(
         data: verifier_input,
     };
     
-    msg!("Invoking ZK Verifier...");
+    msg!("Invoking ZK Verifier with 6 public inputs...");
     invoke(
         &instruction,
         &[ctx.accounts.verifier_program.clone()],
@@ -112,8 +124,11 @@ pub fn handler_native(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // Insert new commitment into merkle tree (for partial withdrawals)
+    // If new_commitment is zero, it's a full withdrawal
+    if new_commitment != [0u8; 32] {
+        merkle_tree.insert(new_commitment)?;
+    }
 
     // Transfer SOL from vault treasury to recipient
     let treasury_lamports = ctx.accounts.vault_treasury.lamports();
@@ -128,6 +143,7 @@ pub fn handler_native(
         amount,
         nullifier,
         new_commitment,
+        token_mint: vault.asset_mint,
     });
 
     msg!("Withdrawn {} lamports", amount);
@@ -204,6 +220,13 @@ pub fn handler_token(
     let root = merkle_tree.get_root();
 
     // Verify ZK proof via CPI to verifier program
+    // Noir circuit expects 6 public inputs (in order):
+    // 1. root: Field
+    // 2. nullifier_hash: Field  
+    // 3. recipient: Field
+    // 4. withdraw_amount: Field
+    // 5. new_commitment: Field
+    // 6. token_mint_public: Field
     let mut verifier_input = Vec::new();
     
     // 1. Append proof bytes
@@ -218,10 +241,16 @@ pub fn handler_token(
     // 4. Public Input: Recipient (32 bytes)
     verifier_input.extend_from_slice(&ctx.accounts.recipient.key().to_bytes());
     
-    // 5. Public Input: Amount (32 bytes, Big Endian)
+    // 5. Public Input: Withdraw Amount (32 bytes, Big Endian)
     let mut amount_bytes = [0u8; 32];
     amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
     verifier_input.extend_from_slice(&amount_bytes);
+    
+    // 6. Public Input: New Commitment (32 bytes)
+    verifier_input.extend_from_slice(&new_commitment);
+    
+    // 7. Public Input: Token Mint (32 bytes)
+    verifier_input.extend_from_slice(&vault.asset_mint.to_bytes());
     
     // Invoke verifier program
     let instruction = Instruction {
@@ -230,7 +259,7 @@ pub fn handler_token(
         data: verifier_input,
     };
     
-    msg!("Invoking ZK Verifier...");
+    msg!("Invoking ZK Verifier with 6 public inputs...");
     invoke(
         &instruction,
         &[ctx.accounts.verifier_program.clone()],
@@ -245,8 +274,11 @@ pub fn handler_token(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // Insert new commitment into merkle tree (for partial withdrawals)
+    // If new_commitment is zero, it's a full withdrawal
+    if new_commitment != [0u8; 32] {
+        merkle_tree.insert(new_commitment)?;
+    }
 
     // Transfer tokens from vault to recipient
     let vault_key = vault.key();
@@ -277,6 +309,7 @@ pub fn handler_token(
         amount,
         nullifier,
         new_commitment,
+        token_mint: vault.asset_mint,
     });
 
     msg!("Withdrawn {} tokens", amount);
@@ -292,4 +325,5 @@ pub struct WithdrawnEvent {
     pub amount: u64,
     pub nullifier: [u8; 32],
     pub new_commitment: [u8; 32],
+    pub token_mint: Pubkey,
 }

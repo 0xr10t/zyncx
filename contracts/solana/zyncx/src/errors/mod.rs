@@ -50,6 +50,9 @@ pub enum ZyncxError {
     #[msg("Poseidon hash computation failed")]
     PoseidonHashFailed,
 
+    #[msg("Invalid commitment - cannot be zero")]
+    InvalidCommitment,
+
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
 

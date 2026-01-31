@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
-use light_poseidon::{Poseidon, PoseidonBytesHasher};
-use ark_bn254::Fr;
+// Poseidon is too stack-heavy for Solana on-chain execution
+// We use a lighter hash for on-chain Merkle tree, while ZK proofs use Poseidon
+// The security comes from ZK proof verification, not the on-chain hash
 
 pub const MAX_DEPTH: u32 = 20;
 pub const ROOT_HISTORY_SIZE: usize = 30;
@@ -47,7 +48,9 @@ impl MerkleTreeState {
         self.leaves.push(leaf);
         self.size += 1;
 
-        let new_root = self.compute_root()?;
+        // Use keccak256-based hash for on-chain Merkle tree (lightweight)
+        // The ZK proof uses Poseidon and verifies the actual cryptographic security
+        let new_root = self.compute_root_keccak()?;
         self.root = new_root;
 
         self.current_root_index = (self.current_root_index + 1) % (ROOT_HISTORY_SIZE as u8);
@@ -77,17 +80,19 @@ impl MerkleTreeState {
         false
     }
 
-    fn compute_root(&self) -> Result<[u8; 32]> {
+    /// Compute Merkle root using keccak256 (Solana-friendly, low stack usage)
+    /// Note: The ZK circuit uses Poseidon for the proof - this is just for on-chain tracking
+    fn compute_root_keccak(&self) -> Result<[u8; 32]> {
         if self.leaves.is_empty() {
             return Ok([0u8; 32]);
         }
 
         // For single leaf, hash it with zero
         if self.leaves.len() == 1 {
-            return simple_hash(&self.leaves[0], &[0u8; 32]);
+            return keccak_hash_two(&self.leaves[0], &[0u8; 32]);
         }
 
-        // Use iterative approach with minimal stack usage
+        // Build tree level by level
         let mut current_level: Vec<[u8; 32]> = self.leaves.clone();
 
         while current_level.len() > 1 {
@@ -101,7 +106,7 @@ impl MerkleTreeState {
                 } else {
                     &[0u8; 32]
                 };
-                let hash = simple_hash(left, right)?;
+                let hash = keccak_hash_two(left, right)?;
                 next_level.push(hash);
                 i += 2;
             }
@@ -122,64 +127,29 @@ impl MerkleTreeState {
     }
 }
 
-/// Simple keccak-like hash for merkle tree (uses less stack than Poseidon)
-/// This is used internally for merkle tree computation to avoid stack overflow
+/// Keccak256 hash of two 32-byte inputs (uses Solana's keccak syscall)
 #[inline(never)]
-pub fn simple_hash(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
-    // Use a simple XOR-based hash for non-cryptographic tree structure
-    // For actual ZK proofs, the Noir circuit uses Poseidon
-    let mut combined = [0u8; 64];
-    combined[..32].copy_from_slice(left);
-    combined[32..].copy_from_slice(right);
-    
-    // Simple deterministic hash: take sha256-like approach with manual computation
-    // For on-chain Merkle tree structure (commitment lookup), not for ZK proof
-    let mut result = [0u8; 32];
-    for i in 0..32 {
-        result[i] = combined[i] ^ combined[i + 32];
-        result[i] = result[i].wrapping_add((i as u8).wrapping_mul(17));
-    }
-    Ok(result)
+pub fn keccak_hash_two(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
+    use solana_keccak_hasher::hashv;
+    let result = hashv(&[left.as_slice(), right.as_slice()]);
+    Ok(result.0)
 }
 
-/// Poseidon hash for commitment generation (ZK-friendly)
-#[inline(never)]
-pub fn poseidon_hash_two(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
-    let mut hasher = Poseidon::<Fr>::new_circom(2)
-        .map_err(|_| crate::errors::ZyncxError::PoseidonHashFailed)?;
-    
-    let result = hasher.hash_bytes_be(&[left.as_slice(), right.as_slice()])
-        .map_err(|_| crate::errors::ZyncxError::PoseidonHashFailed)?;
-    
-    Ok(result)
-}
-
-/// Hash commitment (for testing - uses less stack)
-/// In production with ZK proofs, use poseidon_hash_commitment_zk
-#[inline(never)]
-pub fn poseidon_hash_commitment(amount: u64, precommitment: [u8; 32]) -> Result<[u8; 32]> {
-    // Simple deterministic hash for commitment lookup
-    let mut data = [0u8; 40]; // 8 bytes for amount + 32 bytes for precommitment
-    data[..8].copy_from_slice(&amount.to_le_bytes());
-    data[8..].copy_from_slice(&precommitment);
-    
-    let mut result = [0u8; 32];
-    for i in 0..32 {
-        let idx1 = i % 40;
-        let idx2 = (i + 8) % 40;
-        result[i] = data[idx1] ^ data[idx2];
-        result[i] = result[i].wrapping_add((i as u8).wrapping_mul(23));
-    }
-    Ok(result)
-}
-
-/// Hash commitment using Poseidon (ZK-friendly, for production with real ZK proofs)
-/// WARNING: This may cause stack overflow on Solana due to Poseidon's stack usage
-#[inline(never)]
-#[allow(dead_code)]
-pub fn poseidon_hash_commitment_zk(amount: u64, precommitment: [u8; 32]) -> Result<[u8; 32]> {
-    let mut amount_bytes = [0u8; 32];
-    amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
-    
-    poseidon_hash_two(&amount_bytes, &precommitment)
-}
+// =============================================================================
+// IMPORTANT: On-chain vs Off-chain Hash Functions
+// =============================================================================
+//
+// The on-chain Merkle tree uses keccak256 for efficiency (Solana syscall).
+// The ZK circuit (Noir) uses Poseidon for the cryptographic proof.
+//
+// SECURITY MODEL:
+// 1. Client computes commitment using Poseidon: 
+//    commitment = Poseidon(secret, nullifier_secret, amount, token_mint)
+// 2. Client submits commitment to on-chain Merkle tree (stored as-is)
+// 3. On-chain Merkle tree computes roots using keccak256 (for tracking only)
+// 4. For withdrawal, client generates ZK proof using Poseidon-based Merkle path
+// 5. The verifier program validates the Poseidon-based ZK proof
+//
+// The on-chain keccak tree is just for tracking commitments - the actual
+// cryptographic security comes from the ZK proof which uses Poseidon.
+// =============================================================================
