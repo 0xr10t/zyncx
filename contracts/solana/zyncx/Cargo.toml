@@ -22,3 +22,11 @@ anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }
 bytemuck = { version = "1.14", features = ["derive"] }
 # Note: ark-ff, ark-bn254, light-poseidon removed due to zeroize version conflict with solana-program
 # ZK proof verification is done via mock for demo - production would use groth16-solana crate
+
+# Arcium SDK for MPC computation
+# NOTE: Requires Solana toolchain with Cargo 1.85+ for edition2024 support
+# Currently using mock implementations in arcium_mxe.rs
+# Uncomment when Solana CLI updates to support edition2024:
+# arcium-anchor = "0.6.6"
+# arcium-client = "0.6.6"
+# arcium-macros = "0.6.6"
