@@ -1,28 +1,30 @@
+[toolchain]
+anchor_version = "0.31.1"
+
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
-[programs.localnet]
-zyncx = "6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6"
-
 [programs.devnet]
-zyncx = "6Qm7RAmYr8bQxeg2YdxX3dtJwNkKcQ3b7zqFTeZYvTx6"
+zyncx = "4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT"
+
+[programs.localnet]
+zyncx = "4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-# For testing use localnet, for deployment use devnet
-cluster = "Localnet"
-# cluster = "devnet"  # Uncomment for devnet deployment
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
-
-[scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-
-[toolchain]
-anchor_version = "0.30.1"
 
 [workspace]
 members = ["contracts/solana/*"]
 
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 60000
+shutdown_wait = 5000
+upgradeable = false

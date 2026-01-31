@@ -2,11 +2,10 @@
 members = [
     "contracts/solana/*"
 ]
+# Note: encrypted-ixs is excluded from workspace to avoid zeroize version conflict
+# Build encrypted-ixs separately with: cd encrypted-ixs && cargo build
 
 resolver = "2"
-
-[patch.crates-io]
-blake3 = { git = "https://github.com/BLAKE3-team/BLAKE3", tag = "1.5.4" }
 
 [profile.release]
 overflow-checks = true
