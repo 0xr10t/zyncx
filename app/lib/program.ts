@@ -1,7 +1,7 @@
 import { PublicKey, Connection } from '@solana/web3.js';
 import { AnchorProvider, Program, Idl, BN, Wallet } from '@coral-xyz/anchor';
-// @ts-ignore - IDL will be available after deployment
-import idl from '../../../target/idl/zyncx.json';
+// @ts-ignore - IDL imported from local copy
+import idl from './zyncx-idl.json';
 
 // Program ID - deployed on devnet
 export const PROGRAM_ID = new PublicKey('4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT');
