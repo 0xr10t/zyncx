@@ -9,6 +9,7 @@ import { useZyncx, DepositNote, encodeNote, decodeNote, generateDepositSecrets, 
 export default function PrivacyVault() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'swap'>('deposit');
   const [amount, setAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [savedNote, setSavedNote] = useState<DepositNote | null>(null);
   const [copied, setCopied] = useState(false);
@@ -63,7 +64,8 @@ export default function PrivacyVault() {
     if (!noteInput) return;
     try {
       const note = decodeNote(noteInput);
-      await withdrawSol(note);
+      const amount = withdrawAmount ? parseFloat(withdrawAmount) : undefined;
+      await withdrawSol(note, amount);
     } catch (e) {
       console.error('Invalid note format');
     }
@@ -185,7 +187,7 @@ export default function PrivacyVault() {
                     rel="noopener noreferrer"
                     className="text-sm underline mt-1 block"
                   >
-                    View on Explorer →
+                    View on Explorer
                   </a>
                 )}
               </div>
@@ -227,7 +229,7 @@ export default function PrivacyVault() {
                 {savedNote && (
                   <div className="p-4 bg-cyber-purple/10 border border-cyber-purple/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-cyber-purple">⚠️ Save Your Secret Note!</span>
+                      <span className="text-sm font-semibold text-cyber-purple">WARNING: Save Your Secret Note!</span>
                       <div className="flex gap-2">
                         <button onClick={copyNote} className="p-2 hover:bg-white/10 rounded">
                           {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
@@ -258,6 +260,22 @@ export default function PrivacyVault() {
                     rows={4}
                     className="w-full bg-black/50 border border-cyber-purple/30 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-cyber-purple transition-colors font-mono"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Withdrawal Amount (leave empty for full withdrawal)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      placeholder="Full amount"
+                      className="w-full bg-black/50 border border-cyber-purple/30 rounded-lg px-4 py-4 text-xl focus:outline-none focus:border-cyber-purple transition-colors"
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <span className="text-gray-400">SOL</span>
+                    </div>
+                  </div>
                 </div>
 
                 <motion.button
@@ -314,7 +332,7 @@ export default function PrivacyVault() {
                       <span className="text-gray-400">USDC</span>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Rate: 1 SOL ≈ $150 USDC (via Pyth)</p>
+                  <p className="text-xs text-gray-500 mt-1">Rate: 1 SOL = ~$150 USDC (via Pyth)</p>
                 </div>
 
                 <div className="p-3 bg-cyber-purple/10 border border-cyber-purple/20 rounded-lg">
