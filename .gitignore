@@ -6,8 +6,20 @@ node_modules
 test-ledger
 .yarn
 
+# Build folders
+build/
+dist/
+.next/
+out/
+app/.next/
+app/build/
+app/dist/
+
 # Ignore generated documentation and summary files
 *.md
 
 # Keep the Arcium support request file
 !ARCIUM_SUPPORT_REQUEST.md
+temp.json
+temp2.json
+temp3.json

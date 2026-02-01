@@ -69,8 +69,8 @@ export function useZyncx() {
       const [vaultTreasury] = getVaultTreasuryPDA(vault);
 
       // Build deposit instruction
-      // Instruction discriminator for deposit_native
-      const discriminator = new Uint8Array([242, 35, 198, 137, 82, 225, 242, 182]);
+      // Instruction discriminator for deposit_native (from IDL)
+      const discriminator = new Uint8Array([13, 158, 13, 223, 95, 213, 28, 6]);
       
       // Write amount as little-endian u64
       const amountBuffer = new Uint8Array(8);
@@ -118,6 +118,7 @@ export function useZyncx() {
   // Withdraw SOL from the privacy vault using a deposit note
   const withdrawSol = useCallback(async (
     note: DepositNote,
+    withdrawAmount?: number, // Optional: partial withdrawal amount in SOL
     recipientAddress?: string
   ): Promise<string | null> => {
     if (!wallet.publicKey || !wallet.signTransaction) {
@@ -128,27 +129,35 @@ export function useZyncx() {
     setState({ isLoading: true, error: null, lastTx: null });
 
     try {
-      const { nullifierSecret, amount } = parseDepositNote(note);
+      const { nullifierSecret, amount: noteAmount } = parseDepositNote(note);
       const nullifierHash = computeNullifierHash(nullifierSecret);
       const recipient = recipientAddress 
         ? new PublicKey(recipientAddress) 
         : wallet.publicKey;
 
+      // Calculate withdrawal amount (default to full note amount)
+      const amount = withdrawAmount 
+        ? BigInt(Math.floor(withdrawAmount * LAMPORTS_PER_SOL))
+        : noteAmount;
+
       // Derive PDAs
       const [vault] = getVaultPDA(NATIVE_MINT);
       const [merkleTree] = getMerkleTreePDA(vault);
-      const [vaultTreasury, treasuryBump] = getVaultTreasuryPDA(vault);
+      const [vaultTreasury] = getVaultTreasuryPDA(vault);
       const [nullifierPDA] = getNullifierPDA(vault, nullifierHash);
+
+      // Verifier program ID from IDL
+      const VERIFIER_PROGRAM = new PublicKey('AWUEQfGnU2nVYAA3dfKpckDhqjoW6HELT5wvkg9Sve1y');
 
       // Generate mock proof for demo
       const proof = generateMockProof();
       
-      // New commitment (empty for full withdrawal)
+      // New commitment (empty for full withdrawal, would contain new commitment for partial)
       const newCommitment = new Uint8Array(32);
 
       // Build withdraw instruction
-      // Instruction discriminator for withdraw_native
-      const discriminator = new Uint8Array([106, 199, 97, 82, 217, 12, 166, 103]);
+      // Instruction discriminator for withdraw_native (from IDL)
+      const discriminator = new Uint8Array([113, 227, 26, 32, 53, 66, 90, 250]);
       
       // Write amount as little-endian u64
       const amountBuffer = new Uint8Array(8);
@@ -171,15 +180,19 @@ export function useZyncx() {
       instructionDataArray.set(proofLenBuffer, offset); offset += 4;
       instructionDataArray.set(proof, offset);
 
+      // Accounts order from IDL:
+      // 1. recipient, 2. vault, 3. merkle_tree, 4. vault_treasury,
+      // 5. nullifier_account, 6. verifier_program, 7. payer, 8. system_program
       const withdrawIx = new TransactionInstruction({
         keys: [
-          { pubkey: recipient, isSigner: true, isWritable: true },
-          { pubkey: vault, isSigner: false, isWritable: true },
-          { pubkey: merkleTree, isSigner: false, isWritable: true },
-          { pubkey: nullifierPDA, isSigner: false, isWritable: true },
-          { pubkey: vaultTreasury, isSigner: false, isWritable: true },
-          { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: recipient, isSigner: false, isWritable: true }, // recipient
+          { pubkey: vault, isSigner: false, isWritable: true }, // vault
+          { pubkey: merkleTree, isSigner: false, isWritable: true }, // merkle_tree
+          { pubkey: vaultTreasury, isSigner: false, isWritable: true }, // vault_treasury
+          { pubkey: nullifierPDA, isSigner: false, isWritable: true }, // nullifier_account
+          { pubkey: VERIFIER_PROGRAM, isSigner: false, isWritable: false }, // verifier_program
+          { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // payer
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
         ],
         programId: PROGRAM_ID,
         data: Buffer.from(instructionDataArray),
