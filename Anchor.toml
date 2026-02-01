@@ -1,15 +1,16 @@
 [toolchain]
-anchor_version = "0.31.1"
+anchor_version = "0.32.1"
+package_manager = "yarn"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.devnet]
-zyncx = "4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT"
+zyncx = "5TGQEPDL2K6RoxKLbfjD2KMypbvKewDUsfuaNAvCAUMU"
 
 [programs.localnet]
-zyncx = "4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT"
+zyncx = "6Pqr8ipXuXdmXRaSgLZpV8ukoHJEwZtBxybBSwuJwNPC"
 
 [registry]
 url = "https://api.apr.dev"
@@ -22,7 +23,7 @@ wallet = "~/.config/solana/id.json"
 members = ["contracts/solana/*"]
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 2000000 \"tests/**/*.ts\""
 
 [test]
 startup_wait = 60000

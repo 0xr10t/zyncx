@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{instruction::Instruction, program::invoke};
 use anchor_spl::token::{Token, TokenAccount};
 
-use crate::dex::{
-    jupiter::{execute_jupiter_swap, transfer_sol_from_treasury, JUPITER_V6_PROGRAM_ID},
-    types::SwapRoute,
+use crate::{
+    dex::jupiter::{execute_jupiter_swap, transfer_sol_from_treasury, JUPITER_V6_PROGRAM_ID},
+    errors::ZyncxError,
+    state::{MerkleTreeState, NullifierState, VaultState, SwapParam, VaultType},
 };
-use crate::state::{MerkleTreeState, VaultState, VaultType, NullifierState, SwapParam};
-use crate::errors::ZyncxError;
 
 #[derive(Accounts)]
 #[instruction(nullifier: [u8; 32])]
@@ -46,6 +46,13 @@ pub struct SwapNative<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
+    pub verifier_program: AccountInfo<'info>,
+
     /// CHECK: Jupiter V6 program for DEX aggregation
     #[account(address = JUPITER_V6_PROGRAM_ID)]
     pub jupiter_program: AccountInfo<'info>,
@@ -76,18 +83,18 @@ pub fn handler_native<'info>(
     // Get current merkle root
     let root = merkle_tree.get_root();
 
-    // Verify ZK proof
-    let mut amount_bytes = [0u8; 32];
-    amount_bytes[24..32].copy_from_slice(&swap_param.amount_in.to_be_bytes());
+    // Verify ZK proof via CPI to Noir verifier
+    verify_noir_proof_cpi(
+        &ctx.accounts.verifier_program,
+        &proof,
+        &root,
+        &nullifier,
+        &swap_param.recipient,
+        swap_param.amount_in,
+        &new_commitment,
+    )?;
     
-    let public_inputs = [
-        amount_bytes,
-        root,
-        new_commitment,
-        nullifier,
-    ];
-    
-    verify_groth16_proof(&proof, &public_inputs)?;
+    msg!("ZK Proof verified successfully!");
 
     // Mark nullifier as spent
     nullifier_account.bump = ctx.bumps.nullifier_account;
@@ -96,8 +103,12 @@ pub fn handler_native<'info>(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial swaps, insert new commitment for remaining balance
+    let is_partial = new_commitment != [0u8; 32];
+    if is_partial {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial swap: inserted change commitment into merkle tree");
+    }
 
     // Check if this is a direct transfer (same token) or a swap
     let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
@@ -177,6 +188,13 @@ pub struct SwapToken<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
+    pub verifier_program: AccountInfo<'info>,
+
     /// CHECK: Jupiter V6 program for DEX aggregation
     #[account(address = JUPITER_V6_PROGRAM_ID)]
     pub jupiter_program: AccountInfo<'info>,
@@ -208,18 +226,18 @@ pub fn handler_token<'info>(
     // Get current merkle root
     let root = merkle_tree.get_root();
 
-    // Verify ZK proof
-    let mut amount_bytes = [0u8; 32];
-    amount_bytes[24..32].copy_from_slice(&swap_param.amount_in.to_be_bytes());
+    // Verify ZK proof via CPI to Noir verifier
+    verify_noir_proof_cpi(
+        &ctx.accounts.verifier_program,
+        &proof,
+        &root,
+        &nullifier,
+        &swap_param.recipient,
+        swap_param.amount_in,
+        &new_commitment,
+    )?;
     
-    let public_inputs = [
-        amount_bytes,
-        root,
-        new_commitment,
-        nullifier,
-    ];
-    
-    verify_groth16_proof(&proof, &public_inputs)?;
+    msg!("ZK Proof verified successfully!");
 
     // Mark nullifier as spent
     nullifier_account.bump = ctx.bumps.nullifier_account;
@@ -228,8 +246,12 @@ pub fn handler_token<'info>(
     nullifier_account.spent_at = Clock::get()?.unix_timestamp;
     nullifier_account.vault = vault.key();
 
-    // Insert new commitment into merkle tree
-    merkle_tree.insert(new_commitment)?;
+    // For partial swaps, insert new commitment for remaining balance
+    let is_partial = new_commitment != [0u8; 32];
+    if is_partial {
+        merkle_tree.insert(new_commitment)?;
+        msg!("Partial swap: inserted change commitment into merkle tree");
+    }
 
     // Check if this is a direct transfer (same token) or a swap
     let is_direct_transfer = swap_param.src_token == swap_param.dst_token;
@@ -274,12 +296,60 @@ pub fn handler_token<'info>(
     Ok(())
 }
 
-#[allow(unused_variables)]
-fn verify_groth16_proof(proof: &[u8], public_inputs: &[[u8; 32]; 4]) -> Result<()> {
+/// Verify Noir ZK proof via CPI to the deployed verifier program
+/// 
+/// Public inputs order (matching Noir circuit):
+/// 1. root - Merkle tree root
+/// 2. nullifier_hash - Prevents double-spending
+/// 3. recipient - Bound to proof to prevent front-running
+/// 4. withdraw_amount - Amount being swapped
+/// 5. new_commitment - Change commitment for partial swaps
+fn verify_noir_proof_cpi(
+    verifier_program: &AccountInfo,
+    proof: &[u8],
+    root: &[u8; 32],
+    nullifier: &[u8; 32],
+    recipient: &Pubkey,
+    amount: u64,
+    new_commitment: &[u8; 32],
+) -> Result<()> {
     if proof.is_empty() {
         return Err(ZyncxError::InvalidZKProof.into());
     }
-    msg!("ZK Proof verification placeholder - implement with Arcium/groth16-solana");
+
+    // Build verifier instruction data
+    let mut verifier_input = Vec::with_capacity(proof.len() + 160);
+    
+    // Proof bytes
+    verifier_input.extend_from_slice(proof);
+    
+    // Public inputs (must match circuit order)
+    verifier_input.extend_from_slice(root);
+    verifier_input.extend_from_slice(nullifier);
+    verifier_input.extend_from_slice(&recipient.to_bytes());
+    
+    let mut amount_bytes = [0u8; 32];
+    amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
+    verifier_input.extend_from_slice(&amount_bytes);
+    
+    verifier_input.extend_from_slice(new_commitment);
+    
+    let instruction = Instruction {
+        program_id: *verifier_program.key,
+        accounts: vec![],
+        data: verifier_input,
+    };
+    
+    msg!("Verifying ZK proof ({} bytes)", proof.len());
+    
+    invoke(
+        &instruction,
+        &[verifier_program.clone()],
+    ).map_err(|e| {
+        msg!("ZK proof verification failed: {:?}", e);
+        ZyncxError::InvalidZKProof
+    })?;
+    
     Ok(())
 }
 

@@ -1,5 +1,8 @@
-// ZYNCX Encrypted Instructions for Arcium MXE
-// These Arcis circuits define confidential computations processed by Arcium nodes
+// ============================================================================
+// ZYNCX ARCIS MPC CIRCUITS
+// ============================================================================
+// Simplified circuits matching the voting example pattern - single return values
+// ============================================================================
 
 use arcis::*;
 
@@ -7,151 +10,44 @@ use arcis::*;
 mod circuits {
     use arcis::*;
 
-    // ============================================================================
-    // STRUCT DEFINITIONS (must use #[derive(Copy, Clone)])
-    // ============================================================================
-
-    // Input for confidential swap validation
+    /// Vault state stored encrypted on-chain
     #[derive(Copy, Clone)]
-    pub struct ConfidentialSwapInput {
-        pub min_price: u64,
-        pub max_slippage: u16,
-        pub current_price: u64,
-        pub amount: u64,
+    pub struct VaultState {
+        pub pending_deposits: u64,
+        pub total_liquidity: u64,
+        pub total_deposited: u64,
     }
 
-    // Output for confidential swap
-    #[derive(Copy, Clone)]
-    pub struct ConfidentialSwapOutput {
-        pub should_execute: bool,
-        pub min_output: u64,
-    }
-
-    // Input for limit order validation
-    #[derive(Copy, Clone)]
-    pub struct LimitOrderInput {
-        pub target_price: u64,
-        pub is_buy: bool,
-        pub current_price: u64,
-        pub amount: u64,
-    }
-
-    // Output for limit order
-    #[derive(Copy, Clone)]
-    pub struct LimitOrderOutput {
-        pub should_fill: bool,
-        pub execution_price: u64,
-    }
-
-    // Input for DCA (Dollar Cost Averaging) validation
-    #[derive(Copy, Clone)]
-    pub struct DCAInput {
-        pub max_price: u64,
-        pub current_price: u64,
-        pub amount_per_interval: u64,
-        pub interval_index: u32,
-        pub total_intervals: u32,
-    }
-
-    // Output for DCA execution
-    #[derive(Copy, Clone)]
-    pub struct DCAOutput {
-        pub should_execute: bool,
-        pub swap_amount: u64,
-        pub remaining_intervals: u32,
-    }
-
-    // Input for balance verification
-    #[derive(Copy, Clone)]
-    pub struct BalanceCheckInput {
-        pub encrypted_balance: u64,
-        pub required_amount: u64,
-    }
-
-    // ============================================================================
-    // HELPER FUNCTIONS (non-MPC, can be unit tested)
-    // ============================================================================
-
-    pub fn calculate_min_output(amount: u64, price: u64, slippage_bps: u16) -> u64 {
-        let expected = (amount as u128 * price as u128) / 1_000_000_000;
-        let factor = 10000 - slippage_bps as u128;
-        (expected * factor / 10000) as u64
-    }
-
-    // ============================================================================
-    // ENCRYPTED INSTRUCTIONS (require MPC)
-    // ============================================================================
-
-    // Validates swap conditions without revealing trading bounds
-    // Returns encrypted result that only the user can decrypt
+    /// Initialize a new vault with zeroed encrypted state
     #[instruction]
-    pub fn validate_confidential_swap(
-        input: Enc<Shared, ConfidentialSwapInput>,
-        current_price: u64  // Plaintext from Pyth oracle
-    ) -> Enc<Shared, ConfidentialSwapOutput> {
-        let data = input.to_arcis();
-        
-        // Check if current price meets minimum price requirement
-        let price_ok = current_price >= data.min_price;
-        
-        // Calculate minimum output with slippage protection
-        let min_output = calculate_min_output(data.amount, current_price, data.max_slippage);
-        
-        let result = ConfidentialSwapOutput {
-            should_execute: price_ok,
-            min_output,
+    pub fn init_vault(mxe: Mxe) -> Enc<Mxe, VaultState> {
+        let initial_state = VaultState {
+            pending_deposits: 0,
+            total_liquidity: 0,
+            total_deposited: 0,
         };
-        
-        input.owner.from_arcis(result)
+        mxe.from_arcis(initial_state)
     }
 
-    // Checks if limit order conditions are met
+    /// Process a deposit - just updates vault state
     #[instruction]
-    pub fn check_limit_order(
-        input: Enc<Shared, LimitOrderInput>,
-        current_price: u64  // Plaintext market price
-    ) -> (bool, u64) {
-        let data = input.to_arcis();
-        
-        // For buy orders: execute if current price <= target price
-        // For sell orders: execute if current price >= target price
-        let should_fill = if data.is_buy {
-            current_price <= data.target_price
-        } else {
-            current_price >= data.target_price
-        };
-        
-        (should_fill.reveal(), current_price)
+    pub fn process_deposit(
+        deposit_amount: u64,
+        vault_state: Enc<Mxe, VaultState>,
+    ) -> Enc<Mxe, VaultState> {
+        let mut vault = vault_state.to_arcis();
+        vault.pending_deposits = vault.pending_deposits + deposit_amount;
+        vault.total_deposited = vault.total_deposited + deposit_amount;
+        vault_state.owner.from_arcis(vault)
     }
 
-    // Validates DCA execution conditions
+    /// Evaluate swap - returns boolean for whether swap should execute
     #[instruction]
-    pub fn validate_dca_interval(
-        input: Enc<Shared, DCAInput>,
-        current_price: u64  // Plaintext market price
-    ) -> (bool, u64, u32) {
-        let data = input.to_arcis();
-        
-        // Check if we haven't exceeded total intervals
-        let intervals_ok = data.interval_index < data.total_intervals;
-        
-        // Check if price is acceptable
-        let price_ok = current_price <= data.max_price;
-        
-        let should_execute = intervals_ok && price_ok;
-        let remaining = data.total_intervals - data.interval_index - 1;
-        
-        (should_execute.reveal(), data.amount_per_interval.reveal(), remaining.reveal())
-    }
-
-    // Checks if user has sufficient balance without revealing actual balance
-    #[instruction]
-    pub fn verify_sufficient_balance(
-        input: Enc<Shared, BalanceCheckInput>,
-        required: u64  // Plaintext required amount
+    pub fn confidential_swap(
+        encrypted_min_out: Enc<Shared, u64>,
+        current_output: u64,
     ) -> bool {
-        let data = input.to_arcis();
-        let has_sufficient = data.encrypted_balance >= required;
-        has_sufficient.reveal()
+        let min_out = encrypted_min_out.to_arcis();
+        (current_output >= min_out).reveal()
     }
 }

@@ -209,3 +209,53 @@ export function verifyMerklePath(
   const computedRoot = computeRootFromPath(leaf, path, indices);
   return arraysEqual(computedRoot, expectedRoot);
 }
+
+/**
+ * Fetch Merkle path for a commitment from on-chain state
+ * 
+ * @param merkleAccount - Fetched Merkle tree account data
+ * @param commitment - The commitment to find path for
+ * @returns Merkle path data including path, indices, and current root
+ */
+export function fetchMerklePath(
+  merkleAccount: any,
+  commitment: Uint8Array
+): MerklePath {
+  // Extract leaves from account data
+  const leaves: Uint8Array[] = [];
+  const leavesData = merkleAccount.leaves;
+  const numLeaves = Number(merkleAccount.size || merkleAccount.nextIndex || 0);
+  
+  for (let i = 0; i < numLeaves; i++) {
+    // Each leaf is 32 bytes stored as a u8 array
+    let leaf: Uint8Array;
+    if (Array.isArray(leavesData[i])) {
+      leaf = new Uint8Array(leavesData[i]);
+    } else {
+      leaf = new Uint8Array(leavesData.slice(i * 32, (i + 1) * 32));
+    }
+    leaves.push(leaf);
+  }
+  
+  // Compute path for the commitment
+  const result = computeMerklePath(leaves, commitment);
+  
+  if (!result) {
+    throw new Error('Commitment not found in Merkle tree');
+  }
+  
+  // Get the stored root from account
+  const storedRoot = new Uint8Array(merkleAccount.root);
+  
+  // Verify our computed root matches (optional sanity check)
+  if (!arraysEqual(result.root, storedRoot)) {
+    console.warn('Computed root differs from stored root - using stored root');
+    return {
+      ...result,
+      root: storedRoot,
+    };
+  }
+  
+  return result;
+}
+

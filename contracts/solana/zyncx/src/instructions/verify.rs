@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{instruction::Instruction, program::invoke};
 
 use crate::state::{MerkleTreeState, VaultState};
 use crate::errors::ZyncxError;
@@ -16,6 +17,13 @@ pub struct VerifyProof<'info> {
         bump = merkle_tree.bump,
     )]
     pub merkle_tree: Account<'info, MerkleTreeState>,
+
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
+    pub verifier_program: AccountInfo<'info>,
 }
 
 pub fn handler(
@@ -30,19 +38,15 @@ pub fn handler(
     // Get current merkle root
     let root = merkle_tree.get_root();
 
-    // Prepare public inputs for verification
-    let mut amount_bytes = [0u8; 32];
-    amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
-    
-    let public_inputs = [
-        amount_bytes,
-        root,
-        new_commitment,
-        nullifier,
-    ];
-
-    // Verify the ZK proof
-    match verify_groth16_proof(&proof, &public_inputs) {
+    // Verify the ZK proof via CPI to Noir verifier
+    match verify_noir_proof(
+        &ctx.accounts.verifier_program,
+        &proof,
+        &root,
+        &nullifier,
+        amount,
+        &new_commitment,
+    ) {
         Ok(_) => {
             msg!("Proof verification successful");
             Ok(true)
@@ -54,39 +58,66 @@ pub fn handler(
     }
 }
 
-#[allow(unused_variables)]
-fn verify_groth16_proof(proof: &[u8], public_inputs: &[[u8; 32]; 4]) -> Result<()> {
-    // TODO: Integrate with groth16-solana crate for actual verification
-    // 
-    // The verification key would be stored on-chain or embedded in the program
-    // Public inputs: [amount, merkle_root, new_commitment, nullifier]
-    //
-    // Example structure for groth16-solana:
-    // ```
-    // use groth16_solana::groth16::Groth16Verifier;
-    // 
-    // let vk = get_verification_key();
-    // let proof_a = &proof[0..64];
-    // let proof_b = &proof[64..192];
-    // let proof_c = &proof[192..256];
-    // 
-    // let mut verifier = Groth16Verifier::new(
-    //     proof_a,
-    //     proof_b,
-    //     proof_c,
-    //     public_inputs,
-    //     &vk,
-    // )?;
-    // 
-    // verifier.verify()?;
-    // ```
-
+/// Verify a Noir ZK proof via CPI to the deployed verifier program (mixer.so)
+/// 
+/// The Noir circuit (mixer/src/main.nr) expects public inputs in order:
+/// 1. root (32 bytes) - Merkle tree root
+/// 2. nullifier_hash (32 bytes) - Prevents double-spending  
+/// 3. recipient (32 bytes) - Withdrawal recipient (bound to proof)
+/// 4. withdraw_amount (32 bytes) - Amount being withdrawn
+/// 5. new_commitment (32 bytes) - Change commitment (0 for full withdrawal)
+pub fn verify_noir_proof(
+    verifier_program: &AccountInfo,
+    proof: &[u8],
+    root: &[u8; 32],
+    nullifier: &[u8; 32],
+    amount: u64,
+    new_commitment: &[u8; 32],
+) -> Result<()> {
     if proof.is_empty() {
         return Err(ZyncxError::InvalidZKProof.into());
     }
 
-    // Placeholder verification
-    msg!("ZK Proof verification placeholder");
+    // Build verifier instruction data: [proof][public_inputs...]
+    let mut verifier_input = Vec::with_capacity(proof.len() + 160);
+    
+    // Proof bytes (variable length)
+    verifier_input.extend_from_slice(proof);
+    
+    // Public inputs (must match Noir circuit order)
+    // 1. root
+    verifier_input.extend_from_slice(root);
+    
+    // 2. nullifier_hash
+    verifier_input.extend_from_slice(nullifier);
+    
+    // 3. recipient (zero for now - actual binding happens in withdraw/swap)
+    verifier_input.extend_from_slice(&[0u8; 32]);
+    
+    // 4. withdraw_amount as 32-byte big-endian
+    let mut amount_bytes = [0u8; 32];
+    amount_bytes[24..32].copy_from_slice(&amount.to_be_bytes());
+    verifier_input.extend_from_slice(&amount_bytes);
+    
+    // 5. new_commitment
+    verifier_input.extend_from_slice(new_commitment);
+    
+    // Create CPI instruction to verifier
+    let instruction = Instruction {
+        program_id: *verifier_program.key,
+        accounts: vec![],
+        data: verifier_input,
+    };
+    
+    msg!("Invoking Noir verifier with {} byte proof", proof.len());
+    
+    invoke(
+        &instruction,
+        &[verifier_program.clone()],
+    ).map_err(|e| {
+        msg!("Noir proof verification failed: {:?}", e);
+        ZyncxError::InvalidZKProof
+    })?;
     
     Ok(())
 }

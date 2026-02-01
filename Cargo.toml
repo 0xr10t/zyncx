@@ -1,9 +1,8 @@
 [workspace]
 members = [
-    "contracts/solana/*"
+    "contracts/solana/*",
+    "encrypted-ixs"
 ]
-# Note: encrypted-ixs is excluded from workspace to avoid zeroize version conflict
-# Build encrypted-ixs separately with: cd encrypted-ixs && cargo build
 
 resolver = "2"
 

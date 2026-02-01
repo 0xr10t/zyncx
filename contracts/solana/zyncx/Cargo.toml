@@ -9,16 +9,28 @@ crate-type = ["cdylib", "lib"]
 name = "zyncx"
 
 [features]
+default = []
+cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
-cpi = ["no-entrypoint"]
-default = []
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "arcium-anchor/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
 
 [dependencies]
-anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
-anchor-spl = { version = "0.31.1", features = ["token", "associated_token"] }
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.32.1", features = ["token", "associated_token"] }
 bytemuck = { version = "1.14", features = ["derive"] }
-# Note: ark-ff, ark-bn254, light-poseidon removed due to zeroize version conflict with solana-program
-# ZK proof verification is done via mock for demo - production would use groth16-solana crate
+solana-program = "2.0"
+
+# Arcium SDK for MPC computation (pinned to exact versions)
+arcium-client = { version = "=0.6.3", default-features = false }
+arcium-macros = "=0.6.3"
+arcium-anchor = "=0.6.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+

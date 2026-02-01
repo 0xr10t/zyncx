@@ -1,10 +1,10 @@
 import { PublicKey, Connection } from '@solana/web3.js';
 import { AnchorProvider, Program, Idl, BN, Wallet } from '@coral-xyz/anchor';
-// @ts-ignore - IDL imported from local copy
-import idl from './zyncx-idl.json';
+// @ts-ignore - IDL loaded from build output
+import idl from './zyncx.json';
 
 // Program ID - deployed on devnet
-export const PROGRAM_ID = new PublicKey('4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT');
+export const PROGRAM_ID = new PublicKey('5TGQEPDL2K6RoxKLbfjD2KMypbvKewDUsfuaNAvCAUMU');
 
 // Native SOL mint (zero pubkey represents SOL in our system)
 export const NATIVE_MINT = new PublicKey(new Uint8Array(32));
@@ -58,6 +58,42 @@ export function getComputationRequestPDA(requestId: BN): [PublicKey, number] {
   );
 }
 
+// Encrypted account PDAs (for Arcium MXE)
+export function getEncryptedVaultPDA(tokenMint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('enc_vault'), tokenMint.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+export function getEncryptedPositionPDA(vault: PublicKey, user: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('enc_position'), vault.toBuffer(), user.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+export function getSwapRequestPDA(computationOffset: BN): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('swap_request'), computationOffset.toArrayLike(Buffer, 'le', 8)],
+    PROGRAM_ID
+  );
+}
+
+export function getLimitOrderPDA(vault: PublicKey, user: PublicKey, orderId: BN): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('limit_order'), vault.toBuffer(), user.toBuffer(), orderId.toArrayLike(Buffer, 'le', 8)],
+    PROGRAM_ID
+  );
+}
+
+export function getDCAConfigPDA(vault: PublicKey, user: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('dca_config'), vault.toBuffer(), user.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
 // IDL type definitions (simplified for demo)
 export interface VaultState {
   bump: number;
@@ -96,5 +132,6 @@ export function getProgram(connection: Connection, wallet: Wallet | any): Progra
     wallet,
     { commitment: 'confirmed' }
   );
-  return new Program(idl as Idl, PROGRAM_ID, provider);
+  // @ts-ignore - Anchor version compatibility
+  return new Program(idl as Idl, provider);
 }

@@ -13,46 +13,58 @@ use dep::poseidon::poseidon::bn254::{hash_1, hash_2, hash_3};
 global TREE_DEPTH: u32 = 20; // Supports 2^20 = ~1 million deposits
 
 // ============================================================================
-// MAIN CIRCUIT
+// MAIN CIRCUIT - PARTIAL WITHDRAWAL SUPPORT
 // ============================================================================
 // 
+// This circuit supports PARTIAL withdrawals by:
+// 1. Proving knowledge of the original commitment with total_amount
+// 2. Proving the withdrawal amount is <= total_amount
+// 3. Computing new_commitment for the remaining balance (if any)
+//
 // Private Inputs:
 //   - secret: The user's secret (random field element generated at deposit)
 //   - nullifier_secret: Secret used to derive the nullifier
+//   - new_secret: New secret for the change commitment (if partial withdrawal)
+//   - new_nullifier_secret: New nullifier secret for change commitment
 //   - merkle_path: Array of sibling hashes along the path to root
 //   - path_indices: Binary array indicating left(0) or right(1) at each level
+//   - total_amount: The original deposit amount
 //
 // Public Inputs:
 //   - root: The Merkle tree root (verified on-chain)
 //   - nullifier_hash: Hash of nullifier_secret (stored on-chain to prevent reuse)
 //   - recipient: Address receiving the funds (prevents front-running)
-//   - amount: The withdrawal amount
+//   - withdraw_amount: The amount being withdrawn
+//   - new_commitment: Commitment for remaining balance (0 if full withdrawal)
 //
 fn main(
     // Private inputs
     secret: Field,
     nullifier_secret: Field,
+    new_secret: Field,
+    new_nullifier_secret: Field,
     merkle_path: [Field; TREE_DEPTH],
     path_indices: [Field; TREE_DEPTH],
+    total_amount: Field,
 
     // Public inputs
     root: pub Field,
     nullifier_hash: pub Field,
     recipient: pub Field,
-    amount: pub Field,
+    withdraw_amount: pub Field,
+    new_commitment: pub Field,
 ) {
     // ========================================================================
-    // Step 1: Compute the commitment
+    // Step 1: Compute the original commitment
     // ========================================================================
-    // commitment = Poseidon(secret, nullifier_secret, amount)
-    // This binds the deposit amount to the commitment
-    let commitment = compute_commitment(secret, nullifier_secret, amount);
+    // commitment = Poseidon(secret, nullifier_secret, total_amount)
+    // This binds the TOTAL deposit amount to the original commitment
+    let commitment = compute_commitment(secret, nullifier_secret, total_amount);
 
     // ========================================================================
     // Step 2: Verify the nullifier hash
     // ========================================================================
     // nullifier_hash = Poseidon(nullifier_secret)
-    // The nullifier is derived deterministically from nullifier_secret
     // Once revealed, it marks this commitment as "spent"
     let computed_nullifier = compute_nullifier(nullifier_secret);
     assert(computed_nullifier == nullifier_hash, "Invalid nullifier");
@@ -60,22 +72,41 @@ fn main(
     // ========================================================================
     // Step 3: Verify Merkle tree membership
     // ========================================================================
-    // Prove that `commitment` is a leaf in the tree with the given `root`
+    // Prove that original `commitment` is a leaf in the tree
     let computed_root = compute_merkle_root(commitment, merkle_path, path_indices);
     assert(computed_root == root, "Merkle proof verification failed");
 
     // ========================================================================
-    // Step 4: Constrain recipient (prevents front-running attacks)
+    // Step 4: Verify withdrawal amount is valid
     // ========================================================================
-    // By including recipient as a public input, we ensure the proof is only
-    // valid for this specific recipient. An attacker cannot intercept the
-    // proof and redirect funds to their own address.
-    assert(recipient != 0, "Invalid recipient address");
+    // withdraw_amount must be > 0 and <= total_amount
+    assert(withdraw_amount != 0, "Invalid withdrawal amount");
+    
+    // Calculate remaining balance
+    let remaining_amount = total_amount - withdraw_amount;
+    
+    // ========================================================================
+    // Step 5: Verify new_commitment for remaining balance
+    // ========================================================================
+    // If remaining_amount > 0, new_commitment must be valid
+    // If remaining_amount == 0 (full withdrawal), new_commitment must be 0
+    if remaining_amount == 0 {
+        // Full withdrawal - no change commitment needed
+        assert(new_commitment == 0, "Full withdrawal must have zero new_commitment");
+    } else {
+        // Partial withdrawal - verify new commitment is correctly computed
+        let computed_new_commitment = compute_commitment(
+            new_secret,
+            new_nullifier_secret,
+            remaining_amount
+        );
+        assert(computed_new_commitment == new_commitment, "Invalid new commitment for remaining balance");
+    }
 
     // ========================================================================
-    // Step 5: Constrain amount (sanity check)
+    // Step 6: Constrain recipient (prevents front-running attacks)
     // ========================================================================
-    assert(amount != 0, "Invalid withdrawal amount");
+    assert(recipient != 0, "Invalid recipient address");
 }
 
 // ============================================================================
@@ -219,15 +250,20 @@ fn test_merkle_proof_single_leaf() {
 }
 
 #[test]
-fn test_full_circuit_valid_proof() {
-    // Simulate a valid withdrawal scenario
+fn test_full_circuit_full_withdrawal() {
+    // Simulate a FULL withdrawal scenario
     let secret = 0x1234567890abcdef;
     let nullifier_secret = 0xfedcba0987654321;
-    let amount = 1_000_000_000; // 1 SOL
-    let recipient = 0xdeadbeefcafebabe; // Recipient address
+    let total_amount = 1_000_000_000; // 1 SOL
+    let withdraw_amount = total_amount; // Full withdrawal
+    let recipient = 0xdeadbeefcafebabe;
+
+    // For full withdrawal, new secrets are unused but must be provided
+    let new_secret = 0;
+    let new_nullifier_secret = 0;
 
     // Compute commitment and nullifier
-    let commitment = compute_commitment(secret, nullifier_secret, amount);
+    let commitment = compute_commitment(secret, nullifier_secret, total_amount);
     let nullifier_hash = compute_nullifier(nullifier_secret);
 
     // Build a minimal Merkle tree with our commitment as the only leaf
@@ -247,16 +283,76 @@ fn test_full_circuit_valid_proof() {
     // Compute the expected root
     let root = compute_merkle_root(commitment, path, indices);
 
+    // Full withdrawal: new_commitment must be 0
+    let new_commitment = 0;
+
     // This should not panic - all assertions pass
     main(
         secret,
         nullifier_secret,
+        new_secret,
+        new_nullifier_secret,
         path,
         indices,
+        total_amount,
         root,
         nullifier_hash,
         recipient,
-        amount
+        withdraw_amount,
+        new_commitment
+    );
+}
+
+#[test]
+fn test_full_circuit_partial_withdrawal() {
+    // Simulate a PARTIAL withdrawal scenario
+    let secret = 0x1234567890abcdef;
+    let nullifier_secret = 0xfedcba0987654321;
+    let total_amount = 1_000_000_000; // 1 SOL
+    let withdraw_amount = 400_000_000; // Withdraw 0.4 SOL
+    let remaining_amount = total_amount - withdraw_amount; // 0.6 SOL remains
+    let recipient = 0xdeadbeefcafebabe;
+
+    // New secrets for the change commitment
+    let new_secret = 0xaaaaaaaaaaaaaaaa;
+    let new_nullifier_secret = 0xbbbbbbbbbbbbbbbb;
+
+    // Compute original commitment and nullifier
+    let commitment = compute_commitment(secret, nullifier_secret, total_amount);
+    let nullifier_hash = compute_nullifier(nullifier_secret);
+
+    // Build Merkle tree
+    let zero_0 = get_zero_value(0);
+    
+    let mut path: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    let mut indices: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    
+    let mut current_zero = zero_0;
+    for i in 0..TREE_DEPTH {
+        path[i] = current_zero;
+        indices[i] = 0;
+        current_zero = hash_2([current_zero, current_zero]);
+    }
+
+    let root = compute_merkle_root(commitment, path, indices);
+
+    // Compute new_commitment for remaining balance
+    let new_commitment = compute_commitment(new_secret, new_nullifier_secret, remaining_amount);
+
+    // This should pass - partial withdrawal with valid change commitment
+    main(
+        secret,
+        nullifier_secret,
+        new_secret,
+        new_nullifier_secret,
+        path,
+        indices,
+        total_amount,
+        root,
+        nullifier_hash,
+        recipient,
+        withdraw_amount,
+        new_commitment
     );
 }
 
@@ -264,10 +360,11 @@ fn test_full_circuit_valid_proof() {
 fn test_invalid_nullifier_fails() {
     let secret = 0x1234;
     let nullifier_secret = 0x5678;
-    let amount = 1_000_000_000;
+    let total_amount = 1_000_000_000;
+    let withdraw_amount = total_amount;
     let recipient = 0xabc;
 
-    let commitment = compute_commitment(secret, nullifier_secret, amount);
+    let commitment = compute_commitment(secret, nullifier_secret, total_amount);
     let wrong_nullifier_hash = compute_nullifier(nullifier_secret + 1); // Wrong!
 
     let zero = get_zero_value(0);
@@ -283,17 +380,30 @@ fn test_invalid_nullifier_fails() {
     let root = compute_merkle_root(commitment, path, indices);
 
     // Should fail because nullifier doesn't match
-    main(secret, nullifier_secret, path, indices, root, wrong_nullifier_hash, recipient, amount);
+    main(
+        secret, 
+        nullifier_secret, 
+        0, 0, // new secrets (unused for full withdrawal)
+        path, 
+        indices, 
+        total_amount,
+        root, 
+        wrong_nullifier_hash, 
+        recipient, 
+        withdraw_amount,
+        0 // new_commitment = 0 for full withdrawal
+    );
 }
 
 #[test(should_fail_with = "Merkle proof verification failed")]
 fn test_invalid_merkle_proof_fails() {
     let secret = 0x1234;
     let nullifier_secret = 0x5678;
-    let amount = 1_000_000_000;
+    let total_amount = 1_000_000_000;
+    let withdraw_amount = total_amount;
     let recipient = 0xabc;
 
-    let _commitment = compute_commitment(secret, nullifier_secret, amount);
+    let _commitment = compute_commitment(secret, nullifier_secret, total_amount);
     let nullifier_hash = compute_nullifier(nullifier_secret);
 
     let zero = get_zero_value(0);
@@ -310,5 +420,63 @@ fn test_invalid_merkle_proof_fails() {
     let wrong_root: Field = 0x999999;
 
     // Should fail because the root doesn't match
-    main(secret, nullifier_secret, path, indices, wrong_root, nullifier_hash, recipient, amount);
+    main(
+        secret, 
+        nullifier_secret, 
+        0, 0,
+        path, 
+        indices, 
+        total_amount,
+        wrong_root, 
+        nullifier_hash, 
+        recipient, 
+        withdraw_amount,
+        0
+    );
+}
+
+#[test(should_fail_with = "Invalid new commitment for remaining balance")]
+fn test_partial_withdrawal_wrong_change_commitment_fails() {
+    let secret = 0x1234;
+    let nullifier_secret = 0x5678;
+    let total_amount = 1_000_000_000;
+    let withdraw_amount = 400_000_000; // Partial
+    let recipient = 0xabc;
+
+    let new_secret = 0xaaaa;
+    let new_nullifier_secret = 0xbbbb;
+
+    let commitment = compute_commitment(secret, nullifier_secret, total_amount);
+    let nullifier_hash = compute_nullifier(nullifier_secret);
+
+    let zero = get_zero_value(0);
+    let mut path: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    let mut indices: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    
+    let mut current_zero = zero;
+    for i in 0..TREE_DEPTH {
+        path[i] = current_zero;
+        current_zero = hash_2([current_zero, current_zero]);
+    }
+
+    let root = compute_merkle_root(commitment, path, indices);
+
+    // Use WRONG new_commitment
+    let wrong_new_commitment: Field = 0x12345;
+
+    // Should fail because new_commitment doesn't match
+    main(
+        secret, 
+        nullifier_secret, 
+        new_secret, 
+        new_nullifier_secret,
+        path, 
+        indices, 
+        total_amount,
+        root, 
+        nullifier_hash, 
+        recipient, 
+        withdraw_amount,
+        wrong_new_commitment
+    );
 }

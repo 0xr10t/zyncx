@@ -7,7 +7,8 @@
 
 import { Noir } from '@noir-lang/noir_js';
 import { BarretenbergBackend } from '@noir-lang/backend_barretenberg';
-import circuit from '../../mixer/target/mixer.json';
+// @ts-ignore - Circuit JSON loaded from build output
+import circuit from './mixer.json';
 
 // Singleton instances
 let noir: Noir | null = null;

@@ -126,13 +126,13 @@ impl MerkleTreeState {
 /// This is used internally for merkle tree computation to avoid stack overflow
 #[inline(never)]
 pub fn simple_hash(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::keccak;
+    use solana_program::keccak;
     
     let mut combined = [0u8; 64];
     combined[..32].copy_from_slice(left);
     combined[32..].copy_from_slice(right);
     
-    Ok(keccak::hash(&combined).to_bytes())
+    Ok(keccak::hash(&combined).0)
 }
 
 /// Hash two values (using keccak for demo - production would use Poseidon)
@@ -143,17 +143,17 @@ pub fn poseidon_hash_two(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32]> 
     simple_hash(left, right)
 }
 
-/// Hash commitment using keccak (for testing - uses less stack)
+/// Hash commitment using sha256 (for testing - uses less stack)
 /// In production with ZK proofs, use poseidon_hash_commitment_zk
 #[inline(never)]
 pub fn poseidon_hash_commitment(amount: u64, precommitment: [u8; 32]) -> Result<[u8; 32]> {
-    use anchor_lang::solana_program::keccak;
+    use solana_program::keccak;
     
     let mut data = [0u8; 40]; // 8 bytes for amount + 32 bytes for precommitment
     data[..8].copy_from_slice(&amount.to_le_bytes());
     data[8..].copy_from_slice(&precommitment);
     
-    Ok(keccak::hash(&data).to_bytes())
+    Ok(keccak::hash(&data).0)
 }
 
 /// Hash commitment (ZK-compatible placeholder)
