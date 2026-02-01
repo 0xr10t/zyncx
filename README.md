@@ -316,7 +316,6 @@ vercel deploy
 ## Documentation
 
 - **[PROTOCOL.md](./PROTOCOL.md)** - Deep dive into privacy guarantees and technical architecture
-- **[ROADMAP.md](./ROADMAP.md)** - Development roadmap and future features
 - **[docs/](./docs/)** - Integration guides and API reference
 
 ---
