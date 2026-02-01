@@ -306,16 +306,16 @@ zyncx/
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `lib.rs` | Program entry, instruction routing | `deposit_native`, `withdraw_native`, `queue_confidential_swap` |
+| `lib.rs` | Program entry, Arcium macros, instruction routing | `deposit_native`, `withdraw_native`, `queue_confidential_swap`, callbacks |
 | `instructions/initialize.rs` | Vault setup | Creates vault PDA, Merkle tree account |
 | `instructions/deposit.rs` | Handle deposits | Transfers SOL, inserts commitment |
 | `instructions/withdraw.rs` | Handle withdrawals | Verifies proof, checks nullifier, sends SOL |
 | `instructions/swap.rs` | DEX swaps | Jupiter CPI calls |
-| `instructions/confidential.rs` | Confidential ops | Queue computations, handle callbacks |
+| `instructions/verify.rs` | Proof verification | ZK proof helpers |
 | `state/vault.rs` | Vault state | Total deposits, asset mint |
 | `state/merkle_tree.rs` | Merkle tree | Leaves, root history, insert logic |
 | `state/nullifier.rs` | Nullifier PDA | Prevents double-spending |
-| `state/arcium.rs` | Arcium config | Computation request tracking |
+| `state/arcium.rs` | Legacy Arcium types | Computation request tracking |
 | `state/arcium_mxe.rs` | MXE state | Encrypted vault, user positions |
 | `state/pyth.rs` | Oracle integration | Price feed structures |
 | `dex/jupiter.rs` | Jupiter SDK | Swap routing, CPI |
@@ -324,17 +324,11 @@ zyncx/
 
 | Circuit | Purpose | Encrypted Inputs |
 |---------|---------|------------------|
-| `init_vault` | Initialize encrypted vault state | None (MXE only) |
-| `init_position` | Initialize user position | None (MXE only) |
-| `process_deposit` | Process deposit, update vault | `DepositInput` |
-| `evaluate_swap` | Check swap without state change | `SwapBounds` |
-| `confidential_swap` | Full swap with state update | `SwapInput`, `SwapBounds` |
-| `evaluate_limit_order` | Check limit order trigger | `LimitOrderParams` |
-| `compute_withdrawal` | Calculate withdrawal amount | `UserPosition` |
-| `clear_position` | Clear position after withdrawal | `UserPosition` |
-| `process_dca` | DCA interval execution | `DCAConfig` |
-| `update_dca_config` | Update DCA after swap | `DCAConfig` |
-| `verify_sufficient_balance` | Balance check | `BalanceCheckInput` |
+| `init_vault` | Initialize encrypted vault state | None (returns `Enc<Mxe, VaultState>`) |
+| `process_deposit` | Process deposit, update vault | `deposit_amount: u64`, `vault_state: Enc<Mxe, VaultState>` |
+| `confidential_swap` | Check if swap should execute | `encrypted_min_out: Enc<Shared, u64>`, `current_output: u64` |
+
+> **Note:** The circuit set was simplified in v0.3.0. Advanced features like `init_position`, `evaluate_swap`, `evaluate_limit_order`, `compute_withdrawal`, `clear_position`, `process_dca`, `update_dca_config`, and `verify_sufficient_balance` are planned for future releases.
 
 #### Noir Circuit (`mixer/src/main.nr`)
 
@@ -535,30 +529,17 @@ User                    SDK                     Solana Program         ZK Verifi
 ### Data Structures
 
 ```rust
-// User's encrypted trading strategy
-pub struct SwapBounds {
-    pub min_out: u64,           // Minimum output (slippage protection)
-    pub max_slippage_bps: u16,  // Max slippage in basis points
-    pub aggressive: bool,        // Aggressive execution flag
-}
-
-// Encrypted swap amount (NEW!)
-pub struct SwapInput {
-    pub amount: u64,            // Amount to swap (HIDDEN)
-}
-
-// MXE-only vault state
+// MXE-only vault state (current implementation)
 pub struct VaultState {
     pub pending_deposits: u64,
     pub total_liquidity: u64,
     pub total_deposited: u64,
 }
 
-// MXE-only user position
-pub struct UserPosition {
-    pub deposited: u64,
-    pub lp_share: u64,
-}
+// Circuits in v0.3.0:
+// - init_vault(mxe: Mxe) -> Enc<Mxe, VaultState>
+// - process_deposit(amount: u64, vault: Enc<Mxe, VaultState>) -> Enc<Mxe, VaultState>
+// - confidential_swap(min_out: Enc<Shared, u64>, current: u64) -> bool
 ```
 
 ### Encryption Types
@@ -575,8 +556,8 @@ pub struct UserPosition {
 
 | Term | Definition |
 |------|------------|
-| **Commitment** | `Poseidon(secret, nullifier_secret, amount)` - hides deposit details |
-| **Nullifier** | `Poseidon(nullifier_secret)` - unique ID revealed at withdrawal |
+| **Commitment** | `keccak(secret, nullifier_secret, amount)` - hides deposit details |
+| **Nullifier** | `keccak(nullifier_secret)` - unique ID revealed at withdrawal |
 | **Merkle Path** | Sibling hashes needed to compute root from leaf |
 | **Anonymity Set** | Number of deposits that could plausibly be the source of a withdrawal |
 | **MXE** | Multi-Party Execution - Arcium's encrypted computation environment |
@@ -600,4 +581,4 @@ pub struct UserPosition {
 ---
 
 *Last Updated: February 2026*
-*Protocol Version: 0.2.0*
+*Protocol Version: 0.3.0*
