@@ -7,10 +7,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-zyncx = "CVq4XNG8mtrBCvBawm1PRSSa72Dew9yy1rC9C25zJqh3"
+zyncx = "5TGQEPDL2K6RoxKLbfjD2KMypbvKewDUsfuaNAvCAUMU"
 
 [programs.localnet]
-zyncx = "7698BfsbJabinNT1jcmob9TxW7iD2gjtNCT4TbAkhyjH"
+zyncx = "6Pqr8ipXuXdmXRaSgLZpV8ukoHJEwZtBxybBSwuJwNPC"
 
 [registry]
 url = "https://api.apr.dev"

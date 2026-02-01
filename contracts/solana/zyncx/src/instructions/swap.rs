@@ -2,12 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{instruction::Instruction, program::invoke};
 use anchor_spl::token::{Token, TokenAccount};
 
-use crate::dex::{
-    jupiter::{execute_jupiter_swap, transfer_sol_from_treasury, JUPITER_V6_PROGRAM_ID},
-    types::SwapRoute,
+use crate::{
+    dex::jupiter::{execute_jupiter_swap, transfer_sol_from_treasury, JUPITER_V6_PROGRAM_ID},
+    errors::ZyncxError,
+    state::{MerkleTreeState, NullifierState, VaultState, SwapParam, VaultType},
 };
-use crate::state::{MerkleTreeState, VaultState, VaultType, NullifierState, SwapParam};
-use crate::errors::ZyncxError;
 
 #[derive(Accounts)]
 #[instruction(nullifier: [u8; 32])]
@@ -47,8 +46,11 @@ pub struct SwapNative<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: The Noir verifier program (mixer.so)
-    #[account(executable)]
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
     pub verifier_program: AccountInfo<'info>,
 
     /// CHECK: Jupiter V6 program for DEX aggregation
@@ -186,8 +188,11 @@ pub struct SwapToken<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: The Noir verifier program (mixer.so)
-    #[account(executable)]
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
     pub verifier_program: AccountInfo<'info>,
 
     /// CHECK: Jupiter V6 program for DEX aggregation

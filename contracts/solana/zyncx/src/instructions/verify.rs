@@ -18,8 +18,11 @@ pub struct VerifyProof<'info> {
     )]
     pub merkle_tree: Account<'info, MerkleTreeState>,
 
-    /// CHECK: The Noir verifier program (mixer.so deployed via Sunspot)
-    #[account(executable)]
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
     pub verifier_program: AccountInfo<'info>,
 }
 

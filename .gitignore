@@ -5,3 +5,9 @@ target
 node_modules
 test-ledger
 .yarn
+
+# Ignore generated documentation and summary files
+*.md
+
+# Keep the Arcium support request file
+!ARCIUM_SUPPORT_REQUEST.md

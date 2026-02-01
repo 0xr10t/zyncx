@@ -15,7 +15,11 @@ const COMP_DEF_OFFSET_INIT_VAULT: u32 = comp_def_offset("init_vault");
 const COMP_DEF_OFFSET_PROCESS_DEPOSIT: u32 = comp_def_offset("process_deposit");
 const COMP_DEF_OFFSET_CONFIDENTIAL_SWAP: u32 = comp_def_offset("confidential_swap");
 
-declare_id!("7698BfsbJabinNT1jcmob9TxW7iD2gjtNCT4TbAkhyjH");
+declare_id!("5TGQEPDL2K6RoxKLbfjD2KMypbvKewDUsfuaNAvCAUMU");
+
+// Noir ZK Verifier Program (deployed via Sunspot)
+pub const NOIR_VERIFIER_PROGRAM_ID: Pubkey = 
+    pubkey!("AWUEQfGnU2nVYAA3dfKpckDhqjoW6HELT5wvkg9Sve1y");
 
 #[arcium_program]
 pub mod zyncx {

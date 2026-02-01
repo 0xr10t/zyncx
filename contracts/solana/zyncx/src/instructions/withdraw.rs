@@ -42,7 +42,11 @@ pub struct WithdrawNative<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: The Verifier Program deployed via Sunspot (mixer.so)
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
     pub verifier_program: AccountInfo<'info>,
 
     #[account(mut)]
@@ -183,7 +187,11 @@ pub struct WithdrawToken<'info> {
     )]
     pub nullifier_account: Account<'info, NullifierState>,
 
-    /// CHECK: The Verifier Program deployed via Sunspot (mixer.so)
+    /// CHECK: Noir ZK verifier program (address verified via constraint)
+    #[account(
+        executable,
+        address = crate::NOIR_VERIFIER_PROGRAM_ID
+    )]
     pub verifier_program: AccountInfo<'info>,
 
     #[account(mut)]

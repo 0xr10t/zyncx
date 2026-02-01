@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Program ID (deployed on devnet)
-const PROGRAM_ID = new PublicKey('4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT');
+const PROGRAM_ID = new PublicKey('5TGQEPDL2K6RoxKLbfjD2KMypbvKewDUsfuaNAvCAUMU');
 const NATIVE_MINT = new PublicKey(new Uint8Array(32)); // Zero pubkey for SOL
 
 async function main() {

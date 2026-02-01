@@ -6,7 +6,7 @@ use anchor_lang::solana_program::{
 use anchor_spl::token::{Token, TokenAccount};
 
 use crate::errors::ZyncxError;
-use super::types::{SwapRoute, SwapResult, is_native_sol, WSOL_MINT};
+use super::types::{SwapRoute, SwapResult};
 
 /// Jupiter V6 Program ID (same on mainnet, devnet, and testnet)
 /// Address: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
