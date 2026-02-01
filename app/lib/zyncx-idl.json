@@ -1,0 +1,2968 @@
+{
+  "address": "4C1cTQ89vywkBtaPuSXu5FZCuf89eqpXPDbsGMKUhgGT",
+  "metadata": {
+    "name": "zyncx",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Privacy-preserving vault system with confidential computation on Solana"
+  },
+  "instructions": [
+    {
+      "name": "cancel_computation",
+      "docs": [
+        "Cancel an expired computation request"
+      ],
+      "discriminator": [
+        141,
+        221,
+        98,
+        172,
+        244,
+        56,
+        80,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "computation_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "request_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "request_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "check_root",
+      "docs": [
+        "Check if a root exists in the merkle tree history"
+      ],
+      "discriminator": [
+        100,
+        207,
+        107,
+        251,
+        197,
+        8,
+        245,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "merkle_tree",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": "bool"
+    },
+    {
+      "name": "confidential_swap_callback",
+      "docs": [
+        "Callback from Arcium MXE after confidential computation completes",
+        "Only callable by Arcium MXE program"
+      ],
+      "discriminator": [
+        166,
+        104,
+        5,
+        52,
+        17,
+        69,
+        252,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "arcium_signer",
+          "signer": true,
+          "address": "eX55rWCvXgeJdks4Nk3WUGNuqxDCzRXkuCLJmcwYbL6"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  99,
+                  105,
+                  117,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "computation_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "request_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "computation_request.src_token",
+                "account": "ComputationRequest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "jupiter_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "request_id",
+          "type": "u64"
+        },
+        {
+          "name": "computation_success",
+          "type": "bool"
+        },
+        {
+          "name": "encrypted_result",
+          "type": "bytes"
+        },
+        {
+          "name": "node_signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "swap_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "create_nullifier",
+      "docs": [
+        "Create a nullifier account for confidential operations",
+        "Must be called before queue_confidential_swap"
+      ],
+      "discriminator": [
+        171,
+        144,
+        50,
+        154,
+        87,
+        170,
+        57,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit_native",
+      "docs": [
+        "Deposit native SOL into the vault"
+      ],
+      "discriminator": [
+        13,
+        158,
+        13,
+        223,
+        95,
+        213,
+        28,
+        6
+      ],
+      "accounts": [
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "precommitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    },
+    {
+      "name": "deposit_token",
+      "docs": [
+        "Deposit SPL tokens into the vault"
+      ],
+      "discriminator": [
+        11,
+        156,
+        96,
+        218,
+        39,
+        163,
+        180,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "depositor_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "precommitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    },
+    {
+      "name": "initialize_arcium_config",
+      "docs": [
+        "Initialize Arcium MXE configuration"
+      ],
+      "discriminator": [
+        229,
+        41,
+        196,
+        10,
+        72,
+        122,
+        210,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  99,
+                  105,
+                  117,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "mxe_address",
+          "type": "pubkey"
+        },
+        {
+          "name": "computation_fee",
+          "type": "u64"
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_vault",
+      "docs": [
+        "Initialize a new vault for a specific asset (SOL or SPL token)"
+      ],
+      "discriminator": [
+        48,
+        191,
+        163,
+        44,
+        71,
+        129,
+        63,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "asset_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "asset_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "queue_confidential_swap",
+      "docs": [
+        "Queue a confidential swap to Arcium MXE",
+        "User sends encrypted trading bounds; Arcium processes without seeing plaintext",
+        "Note: Nullifier account must already exist (prevents stack overflow)"
+      ],
+      "discriminator": [
+        103,
+        9,
+        181,
+        183,
+        63,
+        138,
+        209,
+        37
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  99,
+                  105,
+                  117,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "computation_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.request_counter",
+                "account": "ArciumConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "docs": [
+            "Nullifier account - must already exist (created via separate instruction)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "params.nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "arcium_program",
+          "address": "eX55rWCvXgeJdks4Nk3WUGNuqxDCzRXkuCLJmcwYbL6"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "ConfidentialSwapParams"
+            }
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "swap_native",
+      "docs": [
+        "Swap native SOL via DEX (Jupiter) with ZK proof"
+      ],
+      "discriminator": [
+        88,
+        147,
+        177,
+        186,
+        129,
+        234,
+        239,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "jupiter_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "swap_param",
+          "type": {
+            "defined": {
+              "name": "SwapParam"
+            }
+          }
+        },
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "name": "swap_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "swap_token",
+      "docs": [
+        "Swap SPL tokens via DEX (Jupiter) with ZK proof"
+      ],
+      "discriminator": [
+        129,
+        185,
+        52,
+        125,
+        128,
+        42,
+        84,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "jupiter_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "swap_param",
+          "type": {
+            "defined": {
+              "name": "SwapParam"
+            }
+          }
+        },
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "name": "swap_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "verify_proof",
+      "docs": [
+        "Verify a ZK proof without executing withdrawal"
+      ],
+      "discriminator": [
+        217,
+        211,
+        191,
+        110,
+        144,
+        13,
+        186,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        }
+      ],
+      "returns": "bool"
+    },
+    {
+      "name": "withdraw_native",
+      "docs": [
+        "Withdraw native SOL from the vault with ZK proof"
+      ],
+      "discriminator": [
+        113,
+        227,
+        26,
+        32,
+        53,
+        66,
+        90,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verifier_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_token",
+      "docs": [
+        "Withdraw SPL tokens from the vault with ZK proof"
+      ],
+      "discriminator": [
+        136,
+        235,
+        181,
+        5,
+        101,
+        109,
+        57,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.asset_mint",
+                "account": "VaultState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  107,
+                  108,
+                  101,
+                  95,
+                  116,
+                  114,
+                  101,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verifier_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nullifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ArciumConfig",
+      "discriminator": [
+        236,
+        198,
+        129,
+        236,
+        236,
+        27,
+        22,
+        85
+      ]
+    },
+    {
+      "name": "ComputationRequest",
+      "discriminator": [
+        185,
+        41,
+        207,
+        185,
+        12,
+        187,
+        163,
+        124
+      ]
+    },
+    {
+      "name": "MerkleTreeState",
+      "discriminator": [
+        110,
+        93,
+        37,
+        106,
+        12,
+        80,
+        172,
+        23
+      ]
+    },
+    {
+      "name": "NullifierState",
+      "discriminator": [
+        234,
+        94,
+        162,
+        253,
+        0,
+        12,
+        107,
+        4
+      ]
+    },
+    {
+      "name": "VaultState",
+      "discriminator": [
+        228,
+        196,
+        82,
+        165,
+        98,
+        210,
+        235,
+        152
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ComputationCancelled",
+      "discriminator": [
+        219,
+        249,
+        77,
+        135,
+        13,
+        204,
+        186,
+        66
+      ]
+    },
+    {
+      "name": "ComputationFailed",
+      "discriminator": [
+        104,
+        178,
+        218,
+        130,
+        31,
+        33,
+        140,
+        215
+      ]
+    },
+    {
+      "name": "ComputationQueued",
+      "discriminator": [
+        243,
+        182,
+        17,
+        111,
+        92,
+        29,
+        135,
+        44
+      ]
+    },
+    {
+      "name": "ConfidentialSwapExecuted",
+      "discriminator": [
+        213,
+        242,
+        3,
+        188,
+        247,
+        38,
+        83,
+        217
+      ]
+    },
+    {
+      "name": "DepositedEvent",
+      "discriminator": [
+        199,
+        86,
+        202,
+        20,
+        77,
+        150,
+        160,
+        164
+      ]
+    },
+    {
+      "name": "SwappedEvent",
+      "discriminator": [
+        124,
+        229,
+        186,
+        62,
+        194,
+        42,
+        206,
+        167
+      ]
+    },
+    {
+      "name": "WithdrawnEvent",
+      "discriminator": [
+        215,
+        234,
+        237,
+        115,
+        73,
+        123,
+        104,
+        146
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidDepositAmount",
+      "msg": "Invalid deposit amount - must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidWithdrawalAmount",
+      "msg": "Invalid withdrawal amount - must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidSwapAmount",
+      "msg": "Invalid swap amount - must be greater than zero"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidFeeAmount",
+      "msg": "Invalid fee amount - must be greater than zero"
+    },
+    {
+      "code": 6004,
+      "name": "VaultNotFound",
+      "msg": "Vault not found for the specified asset"
+    },
+    {
+      "code": 6005,
+      "name": "VaultAlreadyRegistered",
+      "msg": "Vault already registered for this asset"
+    },
+    {
+      "code": 6006,
+      "name": "ZeroAddress",
+      "msg": "Zero address provided"
+    },
+    {
+      "code": 6007,
+      "name": "NullifierAlreadySpent",
+      "msg": "Nullifier has already been spent"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidZKProof",
+      "msg": "Invalid ZK proof verification failed"
+    },
+    {
+      "code": 6009,
+      "name": "AmountMismatch",
+      "msg": "Amount mismatch between expected and received"
+    },
+    {
+      "code": 6010,
+      "name": "NativeTransferFailed",
+      "msg": "Native SOL transfer failed"
+    },
+    {
+      "code": 6011,
+      "name": "NativeFundReceived",
+      "msg": "Native fund received for alternative asset deposit"
+    },
+    {
+      "code": 6012,
+      "name": "MaxDepthReached",
+      "msg": "Merkle tree has reached maximum depth"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidMerkleProof",
+      "msg": "Invalid Merkle proof"
+    },
+    {
+      "code": 6014,
+      "name": "RootNotFound",
+      "msg": "Root not found in history"
+    },
+    {
+      "code": 6015,
+      "name": "PoseidonHashFailed",
+      "msg": "Poseidon hash computation failed"
+    },
+    {
+      "code": 6016,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidPublicInputs",
+      "msg": "Invalid public inputs for ZK proof"
+    },
+    {
+      "code": 6018,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidSwapRouter",
+      "msg": "Invalid swap router program"
+    },
+    {
+      "code": 6020,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds in vault"
+    },
+    {
+      "code": 6021,
+      "name": "SlippageExceeded",
+      "msg": "Swap slippage exceeded"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidSwapRoute",
+      "msg": "Invalid swap route"
+    },
+    {
+      "code": 6023,
+      "name": "SwapExecutionFailed",
+      "msg": "DEX swap execution failed"
+    },
+    {
+      "code": 6024,
+      "name": "ConfidentialSwapsDisabled",
+      "msg": "Confidential swaps are currently disabled"
+    },
+    {
+      "code": 6025,
+      "name": "AmountTooSmall",
+      "msg": "Amount is below minimum threshold"
+    },
+    {
+      "code": 6026,
+      "name": "AmountTooLarge",
+      "msg": "Amount exceeds maximum threshold"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidComputationStatus",
+      "msg": "Invalid computation status for this operation"
+    },
+    {
+      "code": 6028,
+      "name": "ComputationExpired",
+      "msg": "Computation request has expired"
+    },
+    {
+      "code": 6029,
+      "name": "ComputationNotExpired",
+      "msg": "Computation has not expired yet - cannot cancel"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidArciumSignature",
+      "msg": "Invalid Arcium callback signature"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidEncryptedStrategy",
+      "msg": "Invalid encrypted strategy format"
+    },
+    {
+      "code": 6032,
+      "name": "InvalidMint",
+      "msg": "Invalid token mint for operation"
+    },
+    {
+      "code": 6033,
+      "name": "InvalidPriceFeed",
+      "msg": "Invalid price feed data"
+    },
+    {
+      "code": 6034,
+      "name": "StalePriceFeed",
+      "msg": "Price feed is stale"
+    },
+    {
+      "code": 6035,
+      "name": "PriceConditionNotMet",
+      "msg": "Price condition not met"
+    }
+  ],
+  "types": [
+    {
+      "name": "ArciumConfig",
+      "docs": [
+        "Global state for Arcium integration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority that can update config"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mxe_address",
+            "docs": [
+              "Arcium MXE cluster address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "computation_fee",
+            "docs": [
+              "Fee for using confidential computation (in lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "request_counter",
+            "docs": [
+              "Request counter for unique IDs"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timeout_seconds",
+            "docs": [
+              "Computation timeout in seconds"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "swaps_enabled",
+            "docs": [
+              "Whether confidential swaps are enabled"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "limit_orders_enabled",
+            "docs": [
+              "Whether confidential limit orders are enabled"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "min_amount",
+            "docs": [
+              "Minimum amount for confidential operations"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_amount",
+            "docs": [
+              "Maximum amount for confidential operations"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationFailed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationQueued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "computation_type",
+            "type": {
+              "defined": {
+                "name": "ComputationType"
+              }
+            }
+          },
+          {
+            "name": "src_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationRequest",
+      "docs": [
+        "State account tracking a queued Arcium computation"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "request_id",
+            "docs": [
+              "Unique request ID"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "docs": [
+              "User who initiated the request"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "docs": [
+              "Vault associated with this computation"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "computation_type",
+            "docs": [
+              "Type of computation"
+            ],
+            "type": {
+              "defined": {
+                "name": "ComputationType"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status"
+            ],
+            "type": {
+              "defined": {
+                "name": "ComputationStatus"
+              }
+            }
+          },
+          {
+            "name": "encrypted_strategy",
+            "docs": [
+              "Encrypted strategy (FHE ciphertext)"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "callback_instruction",
+            "docs": [
+              "Callback instruction name"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount involved in the computation"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "src_token",
+            "docs": [
+              "Source token mint"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "docs": [
+              "Destination token mint"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nullifier",
+            "docs": [
+              "Nullifier for the privacy proof"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_commitment",
+            "docs": [
+              "New commitment after operation"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "queued_at",
+            "docs": [
+              "Timestamp when queued"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "docs": [
+              "Timestamp when completed (0 if not completed)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "result",
+            "docs": [
+              "Result from Arcium (encrypted or status code)"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Expiry timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationStatus",
+      "docs": [
+        "Computation status in the Arcium MXE"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Processing"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationType",
+      "docs": [
+        "Type of confidential computation"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ConfidentialSwap"
+          },
+          {
+            "name": "ConfidentialLimitOrder"
+          },
+          {
+            "name": "ConfidentialDCA"
+          },
+          {
+            "name": "Custom"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfidentialSwapExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "src_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "executed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfidentialSwapParams",
+      "docs": [
+        "Parameters for a confidential swap request"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "src_token",
+            "docs": [
+              "Source token mint (what user is selling)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "docs": [
+              "Destination token mint (what user is buying)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount to swap (from shielded balance)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "encrypted_bounds",
+            "docs": [
+              "Encrypted trading bounds (FHE ciphertext)",
+              "Contains: min_price, max_slippage, deadline"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "recipient",
+            "docs": [
+              "Recipient of swapped tokens (can be shielded)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nullifier",
+            "docs": [
+              "Nullifier for this operation"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_commitment",
+            "docs": [
+              "New commitment after operation"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "depositor",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "precommitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerkleTreeState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "depth",
+            "type": "u8"
+          },
+          {
+            "name": "size",
+            "type": "u64"
+          },
+          {
+            "name": "current_root_index",
+            "type": "u8"
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "roots",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                30
+              ]
+            }
+          },
+          {
+            "name": "leaves",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "NullifierState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "spent",
+            "type": "bool"
+          },
+          {
+            "name": "spent_at",
+            "type": "i64"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapParam",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "src_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "min_amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwappedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "src_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "min_amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_type",
+            "type": {
+              "defined": {
+                "name": "VaultType"
+              }
+            }
+          },
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "merkle_tree",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Native"
+          },
+          {
+            "name": "Alternative"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawnEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
