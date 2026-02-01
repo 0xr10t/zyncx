@@ -26,12 +26,15 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that combines:
 | Technology | Purpose |
 |------------|---------|
 | **Noir ZK Circuits** | Prove ownership without revealing which deposit is yours |
-| **Arcium MXE** | Execute trading logic in encrypted Multi-Party Computation |
+| **Arcium MXE** | MEV-protected swap verification with encrypted parameters |
 | **Poseidon Hashes** | Efficient cryptographic commitments (ZK-friendly) |
 | **Merkle Trees** | Efficient membership proofs (is my deposit in the pool?) |
 | **Nullifiers** | Prevent double-spending without revealing identity |
 
-**The core privacy guarantee:** Once funds enter the shielded pool, all operations (swaps, balance changes, partial withdrawals) are hidden from observers until final withdrawal.
+**The core privacy guarantees:**
+1. **Deposit-Withdrawal Unlinkability:** Once funds enter the shielded pool, the link between deposit and withdrawal is cryptographically broken via ZK proofs
+2. **MEV Protection:** Swap minimum output thresholds are encrypted, preventing front-running and sandwich attacks
+3. **Partial Withdrawals:** Users can withdraw any portion of their balance while keeping the remainder private
 
 ---
 
@@ -42,11 +45,8 @@ Zyncx is a privacy-preserving DeFi protocol on Solana that combines:
 | What's Hidden | How It's Hidden | Who Can't See It |
 |---------------|-----------------|------------------|
 | **Withdrawal-to-Deposit Link** | ZK proofs only reveal "I own *some* deposit" without revealing which one | Everyone |
-| **Trading Strategy** | Executed inside Arcium MXE encrypted enclave | Everyone (including Arcium nodes) |
-| **Swap Parameters** | Min/max bounds, slippage tolerance encrypted | Validators, MEV bots |
-| **Swap Amount** | Encrypted via `Enc<Shared, SwapInput>` - only user + MXE can decrypt | Everyone except user |
-| **Internal Balance Changes** | All state changes happen in encrypted memory | Everyone |
-| **Number of Operations** | Multiple swaps between deposit and withdrawal are invisible | Everyone |
+| **Swap Minimum Output** | Encrypted via `Enc<Shared, u64>` - only user + MXE can decrypt | Validators, MEV bots |
+| **Internal Balance Changes** | Vault state changes happen in encrypted MXE memory | Everyone |
 | **Partial Withdrawal Pattern** | Each partial withdrawal creates fresh commitment | Blockchain observers |
 
 ### 🔐 How Link Breaking Works
@@ -59,13 +59,15 @@ DEPOSIT PHASE:
   On-chain: "Someone deposited 10 SOL" (amount visible at deposit)
   Hidden: secret_A, nullifier_secret_A
 
-INTERNAL OPERATIONS (inside Arcium MXE):
-  Swap 5 SOL → USDC → SOL (arbitrage)
-  Balance changes: 10 SOL → 12 SOL
+SWAP PHASE (MEV Protection via Arcium MXE):
+  User wants to swap with min_out = 100 USDC
+  1. Encrypt min_out with MXE public key
+  2. Call queue_confidential_swap(encrypted_min_out, current_output: 102)
+  3. MXE decrypts, compares: 102 ≥ 100? → true
+  4. Only the boolean result is revealed
   
-  On-chain: Nothing visible!
-  All computation in encrypted MPC
-  Swap amount is ENCRYPTED (Enc<Shared, SwapInput>)
+  On-chain: current_output visible, result (true/false) visible
+  Hidden: Your minimum acceptable output (MEV protection!)
 
 WITHDRAWAL PHASE:
   User generates ZK proof:
@@ -179,48 +181,46 @@ The ZK circuit verifies:
 
 ### 5. Arcium MXE (Multi-Party Computation)
 
-Trading logic runs inside Arcium's encrypted execution environment:
+Swap verification runs inside Arcium's encrypted execution environment to protect against MEV:
 
 ```
-USER → Encrypted Inputs → [ARCIUM MXE] → Encrypted Outputs → USER
-                              ↓
-                     (Computation happens here)
-                     (No single node sees plaintext)
-                     (Only threshold of nodes together)
-                     (Even they don't see your data)
+USER → Encrypted min_out → [ARCIUM MXE] → Boolean result → BLOCKCHAIN
+                               ↓
+                    (Decryption happens here)
+                    (No single node sees plaintext)
+                    (Only threshold of nodes together)
+                    (Result: should swap execute?)
 ```
 
-**What runs inside MXE:**
-- Balance checking (do you have enough?)
-- Swap amount validation (encrypted!)
-- Swap bound verification (is min_out met?)
-- Slippage calculations
-- Fee computations
+**What runs inside MXE (v0.3.0):**
+- Vault state initialization (`init_vault`)
+- Deposit processing and state updates (`process_deposit`)
+- Swap threshold verification (`confidential_swap`)
 
-**What Arcium nodes see:** Encrypted blobs. Even with collusion, they only see that "some computation happened."
+**Privacy benefit:** MEV bots see the current DEX output and whether the swap executed, but they CANNOT see your minimum acceptable output. This prevents:
+- Front-running attacks
+- Sandwich attacks
+- Slippage exploitation
 
-### 6. Encrypted Swap Amounts
+### 6. Confidential Swap Verification
 
-The `confidential_swap` function now encrypts the swap amount:
+The `confidential_swap` function verifies swap conditions without revealing the minimum output threshold:
 
 ```rust
 #[instruction]
 pub fn confidential_swap(
-    swap_input: Enc<Shared, SwapInput>,   // ← ENCRYPTED swap amount!
-    swap_bounds: Enc<Shared, SwapBounds>, // ← ENCRYPTED trading bounds
-    vault_state: Enc<Mxe, VaultState>,
-    user_position: Enc<Mxe, UserPosition>,
-    current_price: u64,                    // Plaintext from oracle
-) -> (Enc<Shared, SwapResult>, Enc<Mxe, VaultState>, Enc<Mxe, UserPosition>)
+    encrypted_min_out: Enc<Shared, u64>,  // ← ENCRYPTED minimum output!
+    current_output: u64,                   // Plaintext from DEX
+) -> bool                                  // Only reveals: should we execute?
 ```
 
 | Parameter | Encryption | Who Can Decrypt |
 |-----------|------------|-----------------|
-| `swap_input.amount` | `Enc<Shared, _>` | User + MXE only |
-| `swap_bounds` | `Enc<Shared, _>` | User + MXE only |
-| `vault_state` | `Enc<Mxe, _>` | MXE only |
-| `user_position` | `Enc<Mxe, _>` | MXE only |
-| `current_price` | Plaintext | Everyone (from Pyth oracle) |
+| `encrypted_min_out` | `Enc<Shared, u64>` | User + MXE only |
+| `current_output` | Plaintext | Everyone (from DEX quote) |
+| Return value | Plaintext boolean | Everyone |
+
+**Privacy benefit:** MEV bots cannot see your minimum acceptable output, preventing front-running and sandwich attacks. The MXE decrypts your threshold, compares it with the current DEX output, and reveals only whether the swap should execute.
 
 ---
 
@@ -258,13 +258,14 @@ pub fn confidential_swap(
                                           ├──▶ Transfer SOL to vault
                                           └──▶ Emit event (amount visible)
 
-2. CONFIDENTIAL SWAP (Inside Arcium)
-   User ──(encrypted params)──▶ Queue Computation ──▶ Arcium MXE
-                                                          │
-                                                          ├──▶ Decrypt in secure enclave
-                                                          ├──▶ Execute swap logic
-                                                          ├──▶ Re-encrypt results
-                                                          └──▶ Callback to Solana
+2. CONFIDENTIAL SWAP (MEV-Protected via Arcium)
+   User ──(encrypted_min_out, current_output)──▶ Queue Computation ──▶ Arcium MXE
+                                                                           │
+                                                                           ├──▶ Decrypt min_out
+                                                                           ├──▶ Compare: current ≥ min?
+                                                                           └──▶ Return boolean result
+                                                                                     │
+   Execute swap if result = true ◀───────── Callback to Solana ◀──────────────────┘
 
 3. WITHDRAWAL
    User ──(ZK proof, nullifier, amount)──▶ Solana Program
@@ -286,17 +287,29 @@ pub fn confidential_swap(
 zyncx/
 ├── contracts/solana/zyncx/    # Anchor smart contract
 │   └── src/
-│       ├── lib.rs             # Program entry point
+│       ├── lib.rs             # Program entry point + Arcium integration
 │       ├── instructions/      # Transaction handlers
+│       │   ├── deposit.rs     # Deposit handling
+│       │   ├── withdraw.rs    # Withdrawal with ZK verification
+│       │   ├── swap.rs        # DEX swap integration
+│       │   └── verify.rs      # Proof verification helpers
 │       ├── state/             # On-chain account structures
+│       │   ├── vault.rs       # Vault state
+│       │   ├── merkle_tree.rs # Merkle tree for commitments
+│       │   ├── nullifier.rs   # Nullifier tracking
+│       │   └── arcium_mxe.rs  # Encrypted state types
 │       ├── dex/               # Jupiter DEX integration
 │       └── errors/            # Custom error types
-├── mixer/                     # Noir ZK circuits
-│   └── src/
-│       └── main.nr            # Withdrawal proof circuit
 ├── encrypted-ixs/             # Arcium Arcis circuits (MPC logic)
 │   └── src/
-│       └── lib.rs             # MPC circuit definitions
+│       └── lib.rs             # 3 MPC circuits: init_vault, process_deposit, confidential_swap
+├── mixer/                     # Noir ZK circuits
+│   └── src/
+│       └── main.nr            # Withdrawal proof circuit with partial withdrawal
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md        # Technical architecture
+│   ├── INTEGRATION_GUIDE.md   # Deployment & frontend guide
+│   └── README.md              # Quick reference
 └── app/                       # Next.js frontend
 ```
 
@@ -306,29 +319,36 @@ zyncx/
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `lib.rs` | Program entry, Arcium macros, instruction routing | `deposit_native`, `withdraw_native`, `queue_confidential_swap`, callbacks |
+| `lib.rs` | Program entry, Arcium macros, instruction routing | `deposit_native`, `withdraw_native`, `queue_confidential_swap`, `init_*_comp_def`, callbacks |
 | `instructions/initialize.rs` | Vault setup | Creates vault PDA, Merkle tree account |
-| `instructions/deposit.rs` | Handle deposits | Transfers SOL, inserts commitment |
-| `instructions/withdraw.rs` | Handle withdrawals | Verifies proof, checks nullifier, sends SOL |
+| `instructions/deposit.rs` | Handle deposits | Transfers SOL/tokens, inserts commitment |
+| `instructions/withdraw.rs` | Handle withdrawals | Verifies proof, checks nullifier, sends SOL/tokens |
 | `instructions/swap.rs` | DEX swaps | Jupiter CPI calls |
 | `instructions/verify.rs` | Proof verification | ZK proof helpers |
 | `state/vault.rs` | Vault state | Total deposits, asset mint |
 | `state/merkle_tree.rs` | Merkle tree | Leaves, root history, insert logic |
 | `state/nullifier.rs` | Nullifier PDA | Prevents double-spending |
-| `state/arcium.rs` | Legacy Arcium types | Computation request tracking |
-| `state/arcium_mxe.rs` | MXE state | Encrypted vault, user positions |
-| `state/pyth.rs` | Oracle integration | Price feed structures |
+| `state/arcium_mxe.rs` | MXE state | `EncryptedVaultAccount`, `SwapParam` |
 | `dex/jupiter.rs` | Jupiter SDK | Swap routing, CPI |
 
 #### Arcis MPC Circuits (`encrypted-ixs/src/lib.rs`)
 
-| Circuit | Purpose | Encrypted Inputs |
-|---------|---------|------------------|
-| `init_vault` | Initialize encrypted vault state | None (returns `Enc<Mxe, VaultState>`) |
-| `process_deposit` | Process deposit, update vault | `deposit_amount: u64`, `vault_state: Enc<Mxe, VaultState>` |
-| `confidential_swap` | Check if swap should execute | `encrypted_min_out: Enc<Shared, u64>`, `current_output: u64` |
+| Circuit | Purpose | Inputs | Output |
+|---------|---------|--------|--------|
+| `init_vault` | Initialize encrypted vault state | `mxe: Mxe` | `Enc<Mxe, VaultState>` |
+| `process_deposit` | Process deposit, update vault state | `deposit_amount: u64`, `vault_state: Enc<Mxe, VaultState>` | `Enc<Mxe, VaultState>` |
+| `confidential_swap` | Check if swap meets minimum output | `encrypted_min_out: Enc<Shared, u64>`, `current_output: u64` | `bool` |
 
-> **Note:** The circuit set was simplified in v0.3.0. Advanced features like `init_position`, `evaluate_swap`, `evaluate_limit_order`, `compute_withdrawal`, `clear_position`, `process_dca`, `update_dca_config`, and `verify_sufficient_balance` are planned for future releases.
+**VaultState structure:**
+```rust
+pub struct VaultState {
+    pub pending_deposits: u64,
+    pub total_liquidity: u64,
+    pub total_deposited: u64,
+}
+```
+
+> **Note:** The circuit set was simplified in v0.3.0 to focus on core privacy functionality. Advanced features like position tracking, DCA, and limit orders are planned for future releases.
 
 #### Noir Circuit (`mixer/src/main.nr`)
 
@@ -378,33 +398,38 @@ User                    SDK                     Solana Program         Merkle Tr
   │  locally (CRITICAL!) │                            │                     │
 ```
 
-### Flow 2: Confidential Swap (with Encrypted Amount)
+### Flow 2: Confidential Swap (MEV Protection)
 
 ```
 User                    SDK                     Solana Program         Arcium MXE
   │                      │                            │                     │
   │──swap(SOL→USDC)─────▶│                            │                     │
+  │  min_out = 100 USDC  │                            │                     │
   │                      │                            │                     │
-  │                      │──Encrypt with MXE pubkey:  │                     │
-  │                      │  - swap_amount (HIDDEN!)   │                     │
-  │                      │  - min_out, slippage       │                     │
+  │                      │──Get DEX quote─────────────│                     │
+  │                      │  current_output = 102 USDC │                     │
+  │                      │                            │                     │
+  │                      │──Encrypt min_out with MXE──│                     │
+  │                      │  pubkey (HIDDEN!)          │                     │
   │                      │                            │                     │
   │                      │──queue_confidential_swap───▶                     │
-  │                      │  (encrypted_params)        │                     │
-  │                      │                            │──Forward encrypted──▶│
+  │                      │  (encrypted_min_out,       │                     │
+  │                      │   current_output: 102)     │──Forward encrypted──▶│
   │                      │                            │   request           │
   │                      │                            │                     │
   │                      │                            │    ┌────────────────┤
-  │                      │                            │    │ Decrypt in     │
-  │                      │                            │    │ secure enclave │
-  │                      │                            │    │ Execute swap   │
-  │                      │                            │    │ Re-encrypt     │
+  │                      │                            │    │ Decrypt min_out│
+  │                      │                            │    │ Compare: 102 ≥ │
+  │                      │                            │    │   100? → true  │
   │                      │                            │    └────────────────┤
   │                      │                            │                     │
-  │                      │                            │◀──Callback with─────│
-  │                      │                            │   encrypted result  │
+  │                      │                            │◀──Callback: true────│
+  │                      │                            │   (execute swap!)   │
   │                      │                            │                     │
-  │◀─────────────────────│◀───Swap complete───────────│                     │
+  │◀─────────────────────│◀───Swap executed───────────│                     │
+  │                      │                            │                     │
+  │  MEV bot sees: current_output=102, result=true    │                     │
+  │  MEV bot CANNOT see: your minimum (100 USDC)      │                     │
 ```
 
 ### Flow 3: Partial Withdrawal
@@ -518,8 +543,7 @@ User                    SDK                     Solana Program         ZK Verifi
 | **Confidential Compute** | Arcium MXE | None | Rollup | None |
 | **Partial Withdrawals** | ✅ Yes | ❌ No (fixed amounts) | ✅ Yes | ✅ Yes |
 | **DeFi Integration** | ✅ Yes (Jupiter) | ❌ No | ⚠️ Limited | ❌ No |
-| **Trading Privacy** | ✅ Full (MPC) | N/A | ⚠️ Partial | N/A |
-| **Encrypted Swap Amounts** | ✅ Yes | N/A | ⚠️ Partial | N/A |
+| **MEV Protection** | ✅ Encrypted thresholds | N/A | ⚠️ Partial | N/A |
 | **Speed** | ~400ms | ~15s | ~minutes | ~75s |
 
 ---
@@ -529,17 +553,34 @@ User                    SDK                     Solana Program         ZK Verifi
 ### Data Structures
 
 ```rust
-// MXE-only vault state (current implementation)
+/// MXE-only vault state (encrypted on-chain)
 pub struct VaultState {
     pub pending_deposits: u64,
     pub total_liquidity: u64,
     pub total_deposited: u64,
 }
+```
 
-// Circuits in v0.3.0:
-// - init_vault(mxe: Mxe) -> Enc<Mxe, VaultState>
-// - process_deposit(amount: u64, vault: Enc<Mxe, VaultState>) -> Enc<Mxe, VaultState>
-// - confidential_swap(min_out: Enc<Shared, u64>, current: u64) -> bool
+### Circuit Definitions (v0.3.0)
+
+```rust
+/// Initialize vault with zeroed state
+#[instruction]
+pub fn init_vault(mxe: Mxe) -> Enc<Mxe, VaultState>
+
+/// Process deposit - updates vault totals
+#[instruction]
+pub fn process_deposit(
+    deposit_amount: u64,                    // Plaintext deposit amount
+    vault_state: Enc<Mxe, VaultState>,     // Current encrypted state
+) -> Enc<Mxe, VaultState>                   // Updated encrypted state
+
+/// Confidential swap verification
+#[instruction]
+pub fn confidential_swap(
+    encrypted_min_out: Enc<Shared, u64>,   // User's encrypted minimum
+    current_output: u64,                    // DEX quote (plaintext)
+) -> bool                                   // Should execute?
 ```
 
 ### Encryption Types
@@ -556,8 +597,8 @@ pub struct VaultState {
 
 | Term | Definition |
 |------|------------|
-| **Commitment** | `keccak(secret, nullifier_secret, amount)` - hides deposit details |
-| **Nullifier** | `keccak(nullifier_secret)` - unique ID revealed at withdrawal |
+| **Commitment** | `Poseidon(secret, nullifier_secret, amount)` - hides deposit details |
+| **Nullifier** | `Poseidon(nullifier_secret)` - unique ID revealed at withdrawal |
 | **Merkle Path** | Sibling hashes needed to compute root from leaf |
 | **Anonymity Set** | Number of deposits that could plausibly be the source of a withdrawal |
 | **MXE** | Multi-Party Execution - Arcium's encrypted computation environment |
@@ -566,6 +607,7 @@ pub struct VaultState {
 | **PDA** | Program Derived Address - deterministic Solana account |
 | **Enc<Shared, T>** | Encrypted type decryptable by user + MXE |
 | **Enc<Mxe, T>** | Encrypted type decryptable only by MXE |
+| **MEV** | Maximal Extractable Value - profit from reordering/inserting transactions |
 
 ---
 
@@ -577,6 +619,17 @@ pub struct VaultState {
 - [Solana Program Library](https://spl.solana.com)
 - [Poseidon Hash Function](https://www.poseidon-hash.info)
 - [Jupiter Aggregator](https://station.jup.ag/docs)
+
+---
+
+## Changelog
+
+### v0.3.0 (February 2026)
+- Simplified Arcium circuits to 3 core functions: `init_vault`, `process_deposit`, `confidential_swap`
+- Focused MEV protection on swap minimum output encryption
+- Removed legacy `confidential.rs` instruction module
+- Added comprehensive documentation suite (`docs/`)
+- Updated to Arcium SDK =0.6.3 and solana-program 2.0
 
 ---
 
