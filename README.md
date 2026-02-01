@@ -359,6 +359,4 @@ MIT License - see [LICENSE](./LICENSE) for details
 
 **Built for privacy on Solana**
 
-*Version 0.3.0 | February 2026*
-
 </div>
