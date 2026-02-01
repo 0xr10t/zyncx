@@ -342,37 +342,6 @@ vercel deploy
 - Governance token and DAO
 
 ---
-
-## Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. **Report bugs** - Open an issue with reproduction steps
-2. **Suggest features** - Share your ideas in discussions
-3. **Submit PRs** - Fix bugs or add features (check ROADMAP.md first)
-4. **Improve docs** - Help make our documentation clearer
-
-### Development Setup
-
-```bash
-# Fork and clone the repo
-git clone https://github.com/yourusername/zyncx.git
-
-# Create a feature branch
-git checkout -b feature/amazing-feature
-
-# Make your changes and test
-anchor test
-
-# Commit and push
-git commit -m "Add amazing feature"
-git push origin feature/amazing-feature
-
-# Open a Pull Request
-```
-
----
-
 ## License
 
 MIT License - see [LICENSE](./LICENSE) for details
