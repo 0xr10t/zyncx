@@ -17,45 +17,25 @@ use anchor_lang::prelude::*;
 /// Memory layout:
 /// [0..8]     Anchor discriminator
 /// [8]        bump (1 byte)
-/// [9..41]    authority (Pubkey, 32 bytes)
-/// [41..73]   token_mint (Pubkey, 32 bytes)
-/// [73..169]  vault_state (3 × 32 bytes = 96 bytes encrypted state)
-/// [169..185] nonce (u128, 16 bytes)
-/// [185..193] meta_nonce (u64, 8 bytes)
-/// [193..201] created_at (i64, 8 bytes)
+/// [9..41]    token_mint (Pubkey, 32 bytes)
+/// [41..73]   authority (Pubkey, 32 bytes)
+/// [73..89]   nonce (u128, 16 bytes)
+/// [89..185]  encrypted_state (3 × 32 bytes = 96 bytes encrypted state)
 #[account]
+#[derive(InitSpace)]
 pub struct EncryptedVaultAccount {
     /// PDA bump seed
     pub bump: u8,
-    /// Vault authority
-    pub authority: Pubkey,
     /// Token mint this vault manages
     pub token_mint: Pubkey,
-    
-    /// Encrypted vault state: [pending_deposits, total_liquidity, total_deposited]
-    /// Each is an Enc<Mxe, u64> - 32 bytes per ciphertext
-    pub vault_state: [[u8; 32]; 3],
-    
+    /// Vault authority
+    pub authority: Pubkey,
     /// Nonce for MXE re-encryption (updated by every callback)
     pub nonce: u128,
     
-    /// Application-level nonce for replay protection
-    pub meta_nonce: u64,
-    
-    /// Timestamp when vault was created
-    pub created_at: i64,
-}
-
-impl EncryptedVaultAccount {
-    /// Byte offset to encrypted state (for ArgBuilder .account())
-    /// = 8 (discriminator) + 1 (bump) + 32 (authority) + 32 (token_mint)
-    pub const ENCRYPTED_STATE_OFFSET: usize = 8 + 1 + 32 + 32;
-    
-    /// Size of encrypted state in bytes (3 ciphertexts × 32 bytes)
-    pub const ENCRYPTED_STATE_SIZE: usize = 32 * 3;
-    
-    /// Total account space
-    pub const INIT_SPACE: usize = 1 + 32 + 32 + (32 * 3) + 16 + 8 + 8;
+    /// Encrypted vault state: [pending_deposits, total_liquidity, total_deposited]
+    /// Each is an Enc<Mxe, u64> - 32 bytes per ciphertext
+    pub encrypted_state: [[u8; 32]; 3],
 }
 
 /// Encrypted user position - stores MXE-encrypted user-specific data

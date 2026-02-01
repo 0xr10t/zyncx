@@ -8,5 +8,5 @@ description = "Arcis MPC circuits for ZYNCX confidential computations"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-arcis = "0.6.5"
+arcis = "0.6.3"
 blake3 = "=1.8.2"
