@@ -384,16 +384,6 @@ MIT License - see [LICENSE](./LICENSE) for details
 - **[Arcium](https://arcium.com)** - Multi-party computation infrastructure
 - **[Noir](https://noir-lang.org)** - Zero-knowledge proof framework
 - **[Jupiter](https://jup.ag)** - Best-in-class DEX aggregator on Solana
-- **[Tornado Cash](https://tornado.cash)** - Pioneer in privacy protocols
-
----
-
-## Contact & Community
-
-- **Twitter**: [@zyncx_protocol](https://twitter.com/zyncx_protocol)
-- **Discord**: [Join our community](https://discord.gg/zyncx)
-- **Docs**: [docs.zyncx.io](https://docs.zyncx.io)
-- **Email**: team@zyncx.io
 
 ---
 
